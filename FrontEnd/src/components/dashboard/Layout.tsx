@@ -13,9 +13,10 @@ import {
   ChevronDown,
   Moon,
   Sun,
+  Shield
 } from "lucide-react";
 import { useDarkMode } from "../../wrap";
-import "./layout.css";
+import "./Layout.css";
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -39,7 +40,7 @@ const Layout = () => {
           <a href="/"><Home /><span>Dashboard</span></a>
           <a href="#"><Calendar /><span>Calendar</span></a>
           <a href="/Holistic"><BarChart3 /><span>Analytics</span></a>
-          <a href="#"><Users /><span>Team</span></a>
+          <a href="/permissions"><Shield /><span>Permissions</span></a>
 
           <div className="bottom-links">
             <a href="#"><Settings /><span>Settings</span></a>

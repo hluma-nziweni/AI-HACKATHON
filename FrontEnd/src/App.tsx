@@ -4,6 +4,7 @@ import './App.css';
 import Layout from './components/dashboard/Layout';
 import Homepage from './components/dashboard/Calendar';
 import HolisticAssistant from './components/Pages/HolisticAssist';
+import Permissions from './components/Pages/permissions';
 
 const App: React.FC = () => {
   return (
@@ -15,8 +16,10 @@ const App: React.FC = () => {
           <Route element={<Layout />}>
           <Route path="/" element={<Homepage/>} />
           <Route path="/holistic" element={<HolisticAssistant />} />
+          <Route path="/permissions" element={<Permissions />} /> 
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
+          
         </Routes>
     </BrowserRouter>
   );
