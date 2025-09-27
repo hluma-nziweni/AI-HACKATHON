@@ -1,0 +1,241 @@
+/* Calendar.css */
+.calendar-card {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  border: none;
+  margin-bottom: 2rem;
+  background: #fff;
+}
+.calendar-page-title {
+  font-size: 2rem;          /* Bigger text */
+  font-weight: 700;         /* Bold */
+  margin: 1rem 0;           /* Spacing around */
+  text-align: left;         /* Align left (or center if you prefer) */
+  color: #333;              /* Neutral dark color */
+}
+
+.dark-mode .calendar-page-title {
+  color: #f1f1f1;           /* Light text for dark mode */
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.calendar-title h4 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-weight: 600;
+  color: #6c757d;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 0.5rem;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-day {
+  aspect-ratio: 1/1;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid #00BFFF;
+  position: relative;
+  min-height: 100px;
+  background-color: #fff;
+}
+
+.calendar-day.empty {
+  background-color: #f9f9f9;
+  border-color: #f0f0f0;
+}
+
+.calendar-day.today {
+  background-color: #f8f9ff;
+  border-color: #4285f4;
+}
+
+.calendar-day.has-events {
+  background-color: #fafafa;
+}
+
+.date-number {
+  font-weight: 600;
+  font-size: 14px;
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  color: #495057;
+}
+
+.calendar-day.today .date-number {
+  background-color: #4285f4;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.event-indicators {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: calc(100% - 30px);
+}
+
+.event-indicator {
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.event-indicator:hover {
+  transform: translateY(-2px);
+}
+
+.event-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+}
+
+.event-badge {
+  font-size: 9px;
+  padding: 2px 4px;
+}
+
+.event-start {
+  background-color: rgba(66, 133, 244, 0.1);
+  border-left: 3px solid #4285f4;
+}
+
+.event-end {
+  background-color: rgba(52, 168, 83, 0.1);
+  border-left: 3px solid #34a853;
+}
+
+.calendar-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  justify-content: center;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.legend-color.start {
+  background-color: #4285f4;
+}
+
+.legend-color.end {
+  background-color: #34a853;
+}
+
+/* For small screens */
+@media (max-width: 768px) {
+  .calendar-day {
+    min-height: 60px;
+  }
+
+  .event-indicators {
+    margin-top: 22px;
+    max-height: calc(100% - 24px);
+  }
+
+  .event-indicator {
+    padding: 2px 4px;
+    font-size: 10px;
+  }
+
+  .event-title {
+    max-width: 60%;
+  }
+}
+
+/* 🌙 Dark Mode Overrides */
+.dark-mode .calendar-card {
+  background: #1e1e1e;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .calendar-weekdays {
+  color: #cfcfcf;
+  border-bottom: 1px solid #333;
+}
+
+.dark-mode .calendar-day {
+  background-color: #2a2a2a;
+  border: 1px solid #00bfff;
+  color: #e0e0e0;
+}
+
+.dark-mode .calendar-day.empty {
+  background-color: #1a1a1a;
+  border-color: #333;
+}
+
+.dark-mode .calendar-day.today {
+  background-color: #2d2f3a;
+  border-color: #4285f4;
+}
+
+.dark-mode .date-number {
+  color: #ddd;
+}
+
+.dark-mode .event-start {
+  background-color: rgba(66, 133, 244, 0.2);
+  border-left: 3px solid #4285f4;
+}
+
+.dark-mode .event-end {
+  background-color: rgba(52, 168, 83, 0.2);
+  border-left: 3px solid #34a853;
+}
+
+.dark-mode .calendar-legend {
+  border-top: 1px solid #333;
+}
+
+.dark-mode .legend-item {
+  color: #aaa;
+}

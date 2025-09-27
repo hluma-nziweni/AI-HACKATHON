@@ -1,0 +1,287 @@
+/* Layout container */
+.layout {
+  display: flex;
+  height: 100vh;
+  padding: 20px; /* space around the floating dashboard */
+  box-sizing: border-box;
+}
+
+/* Sidebar */
+/* Sidebar */
+.sidebar {
+  background-color: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s;
+  overflow: hidden;
+  margin-right: 10px; /* space between sidebar and main content */
+
+  /* Cyberpunk neon border */
+  border: 2px solid #00f0ff; 
+}
+
+
+.sidebar.expanded {
+  width: 220px;
+}
+
+.sidebar.collapsed {
+  width: 90px;
+}
+
+/* Sidebar header */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  font-weight: bold;
+  color: #2c2c2c;
+  overflow: hidden;
+}
+
+.sidebar-header .app-name {
+  white-space: nowrap;
+  transition: opacity 0.1s, width 0.1s;
+}
+
+.sidebar.collapsed .app-name {
+  width: 0;
+  opacity: 0;
+}
+
+/* Sidebar nav */
+.sidebar nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+}
+
+.sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  color: #555;
+  text-decoration: none;
+  font-weight: 500;
+  border-radius: 12px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.sidebar nav a:hover {
+  background-color: #e0f2f1;
+  color: #d3d3d3;
+}
+
+/* Sidebar collapsed adjustments */
+.sidebar.collapsed nav a {
+  justify-content: center; /* center icons horizontally */
+  padding: 12px 0;         /* add vertical padding */
+}
+
+.sidebar.collapsed nav a svg {
+  width: 28px;  /* enlarge icons */
+  height: 28px;
+}
+
+.sidebar.collapsed nav a span {
+  display: none;
+}
+
+/* Main content */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 20px; /* floating effect for main card */
+  background-color: #ffffff;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+/* Header */
+/* Header: fixed floating width */
+.header {
+  top: 20px;          /* space from top */
+  left: 20px;         /* fixed distance from left edge */
+  right: 20px;        /* fixed distance from right edge */
+  max-width: calc(100% - 0px); /* maintain total width minus margins */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: #ffffff;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+  z-index: 50;        /* keep above content */
+}
+
+
+.sidebar.collapsed ~ .main .header {
+  left: 20px; /* adjust header position for collapsed sidebar */
+}
+
+/* Header input and buttons */
+.header input {
+  width: 30%;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+}
+
+.header .actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header .actions button {
+  background-color: rgb(255, 251, 251);
+  color: rgb(38, 38, 38);
+  padding: 8px 16px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.header .actions button:hover {
+  background-color: #cccccc;
+}
+
+/* Profile dropdown */
+.profile-dropdown {
+  position: relative;
+}
+
+.profile-dropdown .dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 8px;
+  width: 220px;
+  background-color: #fff;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  padding: 12px;
+  z-index: 20;
+}
+
+.profile-dropdown .dropdown-menu button {
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.profile-dropdown .dropdown-menu button:hover {
+  background-color: #f5f5f5;
+}
+
+.profile-dropdown .dropdown-menu .logout {
+  color: #e53e3e;
+}
+
+/* Main content area */
+.main .content {
+  flex: 1;
+  padding: 40px 24px 24px 24px; /* top padding = header height + spacing */
+  overflow-y: auto;
+  background-color: #f0f2f5;
+  border-radius: 0 0 20px 20px;
+}
+
+.icon-circle {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #b0aeae;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 12px;
+  transition: background-color 0.2s;
+}
+
+.icon-circle:hover {
+  background-color: #979797;
+}
+
+.icon-circle .badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: #e53e3e;
+  color: white;
+  font-size: 10px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+/* Dark mode styles */
+.dark-mode body,
+.dark-mode .layout {
+  background-color: #1e1d1d;
+  color: #e0e0e0;
+}
+
+.dark-mode .sidebar {
+  background-color: #1f1f1f;
+  color: #e0e0e0;
+}
+
+.dark-mode .sidebar nav a {
+  color: #cfcfcf;
+}
+
+.dark-mode .sidebar nav a:hover {
+  background-color: #333;
+  color: #fff;
+}
+
+.dark-mode .main {
+  background-color: #1e1e1e;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+
+.dark-mode .header {
+  background-color: #1e1e1e;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+
+.dark-mode .content {
+  background-color: #121212;
+}
+
+.dark-mode .icon-circle {
+  background-color: #2e2e2e;
+}
+
+.dark-mode .icon-circle:hover {
+  background-color: #444;
+}
+
+.dark-mode .profile-dropdown .dropdown-menu {
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+  border: 1px solid #333;
+}
+
+.dark-mode .profile-dropdown .dropdown-menu button:hover {
+  background-color: #333;
+}
