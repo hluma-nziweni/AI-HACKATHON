@@ -15,7 +15,7 @@ import {
   Sun,
 } from "lucide-react";
 import { useDarkMode } from "../../wrap";
-import "./layout.css";
+import "./Layout.css";
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
