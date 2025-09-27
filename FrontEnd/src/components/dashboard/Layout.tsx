@@ -39,7 +39,7 @@ const Layout = () => {
           <a href="/"><Home /><span>Dashboard</span></a>
           <a href="#"><Calendar /><span>Calendar</span></a>
           <a href="/Holistic"><BarChart3 /><span>Analytics</span></a>
-          <a href="#"><Users /><span>Team</span></a>
+          <a href="/tasks"><Users /><span>Team</span></a>
 
           <div className="bottom-links">
             <a href="#"><Settings /><span>Settings</span></a>

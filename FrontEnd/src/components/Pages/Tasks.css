@@ -1,0 +1,401 @@
+/* SmartTaskList.css */
+.smart-task-list {
+  min-height: 100vh;
+  padding: 2rem;
+  background: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1f2937;
+}
+
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto 2rem;
+}
+
+/* Box Styles */
+.task-box, .insights-box {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.box-header {
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.box-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.header-icon {
+  color: #3b82f6;
+}
+
+/* Time Navigation */
+.time-navigation {
+  padding: 0 1.5rem;
+  display: flex;
+  gap: 2rem;
+  margin-top: 1rem;
+}
+
+.time-tab {
+  padding: 0.5rem 0;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  position: relative;
+  font-size: 0.95rem;
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+
+.time-tab.active {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.time-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #3b82f6;
+}
+
+.time-tab:hover {
+  color: #3b82f6;
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 0;
+}
+
+/* Task Content */
+.task-content {
+  padding: 0.5rem 0;
+}
+
+.task-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s ease;
+}
+
+.task-item:hover {
+  background-color: #f8fafc;
+}
+
+.task-item:last-child {
+  border-bottom: none;
+}
+
+.task-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.task-icon {
+  color: #6b7280;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.task-text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.ai-suggestion {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 0.25rem;
+}
+
+.task-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.defer-button {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.8rem;
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.defer-button:hover {
+  background: #fecaca;
+  border-color: #fca5a5;
+}
+
+.more-icon {
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.more-icon:hover {
+  color: #374151;
+  background: #f3f4f6;
+}
+
+/* Insights Box */
+.insights-box .box-header {
+  padding-bottom: 1rem;
+}
+
+.insight-section {
+  padding: 1.5rem;
+}
+
+.insight-section:last-child {
+  padding-bottom: 1.5rem;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  color: #374151;
+  font-size: 1.1rem;
+}
+
+.section-title svg {
+  color: #6b7280;
+}
+
+/* Flow States */
+.flow-states {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.flow-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+}
+
+.flow-item.highlighted {
+  background: #f0f9ff;
+  border-left: 3px solid #3b82f6;
+}
+
+.flow-time {
+  font-weight: 600;
+  color: #1f2937;
+  min-width: 45px;
+  font-size: 0.9rem;
+}
+
+.flow-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.flow-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.flow-schedule {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* Cognitive Load Graph */
+.cognitive-graph {
+  margin-top: 1rem;
+}
+
+.graph-bars {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.5rem;
+  height: 120px;
+  margin-bottom: 1rem;
+}
+
+.bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  position: relative;
+}
+
+.bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  min-height: 20px;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.bar.highlighted {
+  background: #ef4444 !important;
+}
+
+.bar-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.bar-annotation {
+  position: absolute;
+  top: -70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  z-index: 10;
+  width: max-content;
+  max-width: 200px;
+}
+
+.bar-annotation::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #1f2937;
+}
+
+.insight-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #f0f9ff;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #374151;
+  border-left: 3px solid #3b82f6;
+}
+
+.insight-note svg {
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+/* Footer Navigation */
+.footer-nav {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e5e7eb;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.nav-item {
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+}
+
+.nav-item:hover {
+  color: #3b82f6;
+  background: #f0f9ff;
+}
+
+/* Responsive Design */
+@media (max-width: 968px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .smart-task-list {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .time-navigation {
+    gap: 1rem;
+  }
+  
+  .task-item {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+  
+  .task-right {
+    align-self: flex-end;
+  }
+  
+  .graph-bars {
+    gap: 0.25rem;
+    height: 100px;
+  }
+  
+  .bar-annotation {
+    font-size: 0.7rem;
+    padding: 0.5rem;
+    top: -60px;
+  }
+  
+  .footer-nav {
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+}
