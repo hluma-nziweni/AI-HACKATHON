@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String             @id @default(cuid())
+  email         String             @unique
+  password      String?
+  name          String
+  avatar        String?
+  joinedCourses CourseEnrollment[]
+  forumPosts    ForumPost[]
+  // OAuth fields
+  googleId      String?            @unique
+  microsoftId   String?            @unique
+
+  // ✅ Add this line:
+  coursesTaught Course[] @relation("CourseInstructor")
+  courseReviews   CourseReview[]
+  reviewReplies   ReviewReply[]      // ✅ Replies written by user
+  helpfulVotes    ReviewHelpfulVote[] 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Course {
+  id          String @id @default(cuid())
+  title       String
+  language    String
+  description String
+  level       String
+  category    String
+  hours       String
+  public      String
+  community   String
+  discussions String
+  info        String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // ✅ Add the relation name here:
+  instructor   User   @relation("CourseInstructor", fields: [instructorId], references: [id])
+  instructorId String
+
+  words       Word[]
+  units       CourseUnit[]
+  enrollments CourseEnrollment[]
+  forumPosts  ForumPost[]
+  courseReviews  CourseReview[] 
+}
+
+model CourseEnrollment {
+  id       String @id @default(cuid())
+  user     User   @relation(fields: [userId], references: [id])
+  userId   String
+  course   Course @relation(fields: [courseId], references: [id])
+  courseId String
+  progress String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Word {
+  id       String @id @default(cuid())
+  title    String
+  type     String
+  duration String
+  content  String
+  course   Course @relation(fields: [courseId], references: [id])
+  courseId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CourseUnit {
+  id          String @id @default(cuid())
+  title       String
+  description String?
+  position    Int
+  course      Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId    String
+  lessons     CourseLesson[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CourseLesson {
+  id        String @id @default(cuid())
+  title     String
+  type      String
+  duration  Int?
+  content   String?
+  position  Int
+  unit      CourseUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unitId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ForumPost {
+  id        String   @id @default(cuid())
+  content   String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+  courseId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model CourseReview {
+  id        String   @id @default(cuid())
+  rating    Int
+  review    String?
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  course    Course   @relation(fields: [courseId], references: [id])
+  courseId  String
+  replies   ReviewReply[]         // ✅ Replies to the review
+  helpfulVotes ReviewHelpfulVote[] // ✅ Users who marked the review as helpful
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+}
+
+model ReviewReply {
+  id         String   @id @default(cuid())
+  content    String
+  author     User     @relation(fields: [authorId], references: [id])
+  authorId   String
+  review     CourseReview @relation(fields: [reviewId], references: [id])
+  reviewId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ReviewHelpfulVote {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  review    CourseReview @relation(fields: [reviewId], references: [id])
+  reviewId  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, reviewId]) // Prevent duplicate helpful votes by same user
+}
