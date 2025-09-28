@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { 
   Shield, 
   Zap, 
@@ -17,8 +17,6 @@ import {
 } from 'react-icons/si';
 import { FaGoogleDrive, FaSpotify, FaFigma, FaMicrosoft } from 'react-icons/fa';
 import './permissions.css';
-import { useAssistantData } from '../../context/AssistantContext';
-import { AssistantIntegration } from '../../types/assistant';
 
 interface Service {
   id: string;
@@ -30,73 +28,64 @@ interface Service {
 }
 
 const Permissions: React.FC = () => {
-  const { data } = useAssistantData();
-
-  const integrationIconMap: Record<string, React.ComponentType<any>> = {
-    'google calendar': SiGooglecalendar,
-    'calendar': SiGooglecalendar,
-    'slack': SiSlack,
-    'gmail': SiGmail,
-    'google drive': FaGoogleDrive,
-    'spotify': FaSpotify,
-    'figma': FaFigma,
-    'outlook': FaMicrosoft,
-    'microsoft outlook': FaMicrosoft,
-    'notion': HeartPulse,
-    'asana': Zap
-  };
-
-  const mappedIntegrations: Service[] = useMemo(() => {
-    const integrations: AssistantIntegration[] = data?.plan?.integrations ?? [];
-
-    if (integrations.length === 0) {
-      return [
-        {
-          id: 'google_calendar',
-          name: 'Google Calendar',
-          description: 'Access your calendar to schedule tasks',
-          connected: true,
-          premium: false,
-          icon: SiGooglecalendar
-        },
-        {
-          id: 'slack',
-          name: 'Slack',
-          description: 'Sync with your team communications',
-          connected: true,
-          premium: true,
-          icon: SiSlack
-        },
-        {
-          id: 'gmail',
-          name: 'Gmail',
-          description: 'Read emails to help manage communication',
-          connected: false,
-          premium: false,
-          icon: SiGmail
-        }
-      ];
+  const [services, setServices] = useState<Service[]>([
+    { 
+      id: 'google_calendar', 
+      name: 'Google Calendar', 
+      description: 'Access your calendar to schedule tasks', 
+      connected: true, 
+      premium: false,
+      icon: SiGooglecalendar
+    },
+    { 
+      id: 'slack', 
+      name: 'Slack', 
+      description: 'Sync with your team communications', 
+      connected: true, 
+      premium: true,
+      icon: SiSlack
+    },
+    { 
+      id: 'gmail', 
+      name: 'Gmail', 
+      description: 'Read emails to help manage communication', 
+      connected: false, 
+      premium: false,
+      icon: SiGmail
+    },
+    { 
+      id: 'outlook', 
+      name: 'Microsoft Outlook', 
+      description: 'Sync with Outlook calendar and mail', 
+      connected: false, 
+      premium: true,
+      icon: FaMicrosoft
+    },
+    { 
+      id: 'drive', 
+      name: 'Google Drive', 
+      description: 'Access your documents and files', 
+      connected: false, 
+      premium: true,
+      icon: FaGoogleDrive
+    },
+    { 
+      id: 'spotify', 
+      name: 'Spotify', 
+      description: 'Sync your music preferences and playlists', 
+      connected: false, 
+      premium: true,
+      icon: FaSpotify
+    },
+    { 
+      id: 'figma', 
+      name: 'Figma', 
+      description: 'Connect with your design projects', 
+      connected: false, 
+      premium: true,
+      icon: FaFigma
     }
-
-    return integrations.map((integration, index) => {
-      const key = integration.service.toLowerCase();
-      const IconComponent = integrationIconMap[key] || Settings;
-      return {
-        id: integration.id || `integration-${index}`,
-        name: integration.service,
-        description: integration.description,
-        connected: Boolean(integration.connected),
-        premium: Boolean(integration.premium),
-        icon: IconComponent
-      };
-    });
-  }, [data?.plan?.integrations]);
-
-  const [services, setServices] = useState<Service[]>(mappedIntegrations);
-
-  useEffect(() => {
-    setServices(mappedIntegrations);
-  }, [mappedIntegrations]);
+  ]);
 
   const toggleService = (id: string) => {
     setServices(prev =>

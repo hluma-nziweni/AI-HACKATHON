@@ -17,18 +17,23 @@ import {
 } from "lucide-react";
 import { useDarkMode } from "../../wrap";
 import { AssistantProvider } from "../../context/AssistantContext";
+import { useAssistantData } from "../../context/AssistantContext";
 import "./Layout.css";
 import ProfilePic from '../../assets/Profile.png';
 
 
-const Layout = () => {
+const LayoutShell = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const { darkMode, toggleDarkMode } = useDarkMode();
+  const { data: assistantState, loading: assistantLoading } = useAssistantData();
+
+  const stressLevel = assistantState?.stress?.level ?? 'steady';
+  const stressLabel = assistantState?.stress?.label ?? (assistantLoading ? 'Syncing' : 'Calibrating');
+  const stressScore = assistantState?.stress?.score !== undefined ? Math.round(assistantState.stress.score * 100) : null;
 
   return (
-    <AssistantProvider>
     <div className={`layout ${darkMode ? "dark-mode" : ""}`}>
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? "expanded" : "collapsed"}`}>
@@ -67,7 +72,14 @@ const Layout = () => {
       {/* Main Content */}
       <div className="main">
         <header className="header">
-          <input type="text" placeholder="Search task" />
+          <div className="header-left">
+            <input type="text" placeholder="Search task" />
+            <div className={`status-chip ${stressLevel}`}>
+              <span className="status-dot"></span>
+              <span className="status-text">{stressLabel}</span>
+              {stressScore !== null && <span className="status-score">{stressScore}</span>}
+            </div>
+          </div>
 
           <div className="actions">
             {/* Dark Mode Toggle */}
@@ -129,8 +141,13 @@ const Layout = () => {
         </main>
       </div>
     </div>
-    </AssistantProvider>
   );
 };
+
+const Layout = () => (
+  <AssistantProvider>
+    <LayoutShell />
+  </AssistantProvider>
+);
 
 export default Layout;

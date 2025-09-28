@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -16,6 +16,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import './HolisticAssist.css';
 
 import { useAssistantData } from '../../context/AssistantContext';
+import { AssistantState } from '../../types/assistant';
 
 type ContextForm = {
   heartRate: number;
@@ -63,6 +64,8 @@ const HolisticAssistant: React.FC = () => {
   const [formInitialised, setFormInitialised] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const pendingToastRef = useRef<{ type: Toast['type']; message: string } | null>(null);
+  const prevStateRef = useRef<AssistantState | null>(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -122,47 +125,143 @@ const HolisticAssistant: React.FC = () => {
     }
   }, [assistantState, formInitialised]);
 
+  useEffect(() => {
+    if (!assistantState) {
+      return;
+    }
+
+    const prev = prevStateRef.current;
+    prevStateRef.current = assistantState;
+
+    if (!prev) {
+      return;
+    }
+
+    const diffMessages: string[] = [];
+
+    if (assistantState.stress.level !== prev.stress.level) {
+      diffMessages.push(
+        `Stress level now ${assistantState.stress.label} (${Math.round((assistantState.stress.score || 0) * 100)}/100)`
+      );
+    }
+
+    type MetricKey = 'cognitiveLoad' | 'fatigue' | 'focusReadiness' | 'bufferTime';
+    const metricLabels: Record<MetricKey, string> = {
+      cognitiveLoad: 'Cognitive load',
+      fatigue: 'Fatigue',
+      focusReadiness: 'Focus readiness',
+      bufferTime: 'Buffer time'
+    };
+
+    const metricDiffs = (Object.keys(metricLabels) as MetricKey[])
+      .map((key) => {
+        const current = assistantState.metrics?.[key];
+        const previous = prev.metrics?.[key];
+        if (current === undefined || previous === undefined) {
+          return null;
+        }
+        const delta = current - previous;
+        return {
+          key,
+          label: metricLabels[key],
+          value: current,
+          delta
+        };
+      })
+      .filter((item): item is { key: MetricKey; label: string; value: number; delta: number } => Boolean(item))
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+    const significantDiffs = metricDiffs.filter((item) => Math.abs(item.delta) >= 0.07);
+
+    if (significantDiffs.length > 0) {
+      const topMetric = significantDiffs[0];
+      const direction = topMetric.delta > 0 ? 'up' : 'down';
+      diffMessages.push(
+        `${topMetric.label} ${direction} to ${Math.round(topMetric.value * 100)}%`
+      );
+    }
+
+    const newAutomation = assistantState.automations.find(
+      (automation) => !prev.automations.some((prevAutomation) => prevAutomation.id === automation.id)
+    );
+
+    if (newAutomation) {
+      diffMessages.push(`Automation triggered: ${newAutomation.title}`);
+    }
+
+    const pending = pendingToastRef.current;
+    pendingToastRef.current = null;
+
+    let message = pending?.message ?? '';
+    let toastType: Toast['type'] = pending?.type ?? 'info';
+
+    if (diffMessages.length > 0) {
+      const summary = diffMessages.slice(0, 2).join(' • ');
+      message = message ? `${message} • ${summary}` : summary;
+    }
+
+    if (!message) {
+      return;
+    }
+
+    setToast({ type: toastType, message });
+    setShowToast(true);
+  }, [assistantState]);
+
   const handleRangeChange = (key: keyof ContextForm, transform?: (value: number) => number) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = Number(event.target.value);
     const nextValue = transform ? transform(rawValue) : rawValue;
     setForm((prev) => ({ ...prev, [key]: nextValue }));
   };
 
-  const handleAnalyze = async () => {
-    setAnalyzing(true);
-    try {
-      await analyze({ context: form });
-      setFormInitialised(false);
-      setError(null);
-      setToast({ type: 'success', message: 'Adaptive plan refreshed in real-time.' });
-      setShowToast(true);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      setToast({ type: 'error', message: message || 'Unable to generate recommendations' });
-      setShowToast(true);
-    } finally {
-      setAnalyzing(false);
-    }
-  };
+const handleAnalyze = async () => {
+  setAnalyzing(true);
+  try {
+    await analyze({ context: form });
+    setFormInitialised(false);
+    setError(null);
+    pendingToastRef.current = { type: 'success', message: 'Adaptive plan refreshed.' };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    setError(message);
+    setToast({ type: 'error', message: message || 'Unable to generate recommendations' });
+    setShowToast(true);
+  } finally {
+    setAnalyzing(false);
+  }
+};
 
-  const handleScenarioRun = async (key: string) => {
-    setScenarioLoading(key);
-    try {
-      await runScenario(key);
-      setFormInitialised(false);
-      setError(null);
-      setToast({ type: 'success', message: `Scenario “${key}” loaded.` });
-      setShowToast(true);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to load scenario';
-      setError(message);
-      setToast({ type: 'error', message });
-      setShowToast(true);
-    } finally {
-      setScenarioLoading(null);
-    }
-  };
+const handleScenarioRun = async (key: string) => {
+  const scenarioMeta = scenarios.find((scenario) => scenario.id === key);
+  setScenarioLoading(key);
+  try {
+    await runScenario(key);
+    setFormInitialised(false);
+    setError(null);
+    pendingToastRef.current = {
+      type: 'success',
+      message: scenarioMeta ? `Scenario “${scenarioMeta.label}” loaded.` : 'Scenario loaded.'
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unable to load scenario';
+    setError(message);
+    setToast({ type: 'error', message });
+    setShowToast(true);
+  } finally {
+    setScenarioLoading(null);
+  }
+};
+
+const handleResync = async () => {
+  pendingToastRef.current = { type: 'info', message: 'Live signals resynced.' };
+  try {
+    await refresh();
+    setFormInitialised(false);
+    setError(null);
+  } catch (err) {
+    pendingToastRef.current = null;
+  }
+};
 
   const stressScore = assistantState?.stress?.score ?? 0;
   const stressPercent = useMemo(() => toPercent(stressScore), [stressScore]);
@@ -347,13 +446,7 @@ const HolisticAssistant: React.FC = () => {
             </button>
             <button
               className="cyber-button ghost"
-              onClick={() => {
-                refresh().then(() => {
-                  setError(null);
-                  setToast({ type: 'info', message: 'Resynced live signals from your workspace.' });
-                  setShowToast(true);
-                }).catch(() => {});
-              }}
+              onClick={handleResync}
               disabled={summaryLoading}
             >
               Reset to live feed

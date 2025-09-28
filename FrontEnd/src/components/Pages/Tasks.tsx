@@ -15,20 +15,20 @@ const SmartTaskList: React.FC = () => {
   const tasksPlan: AssistantTasksPlan | undefined = data?.plan?.tasks;
   const insightsPlan: AssistantInsightsPlan | undefined = data?.plan?.insights;
 
-  const iconMap: Record<string, React.ComponentType<{ size?: number }>> = {
-    focus: Zap,
-    wellbeing: HeartPulse,
-    automation: TrendingUp,
-    email: Mail,
-    meeting: Calendar,
-    communication: MessageCircle,
-    alert: AlertCircle,
-    document: FileText,
-    summary: MessageSquare,
-    default: Brain
-  };
+const iconMap: Record<string, React.ComponentType<{ size?: number }>> = {
+  focus: Zap,
+  wellbeing: HeartPulse,
+  automation: TrendingUp,
+  email: Mail,
+  meeting: Calendar,
+  communication: MessageCircle,
+  alert: AlertCircle,
+  document: FileText,
+  summary: MessageSquare,
+  default: Brain
+};
 
-  const defaultFlowData = useMemo(
+const defaultFlowData = useMemo(
     () => [
       { time: '07:00', focus: 20 },
       { time: '09:00', focus: 32 },
@@ -74,6 +74,86 @@ const SmartTaskList: React.FC = () => {
   }, [insightsPlan?.loadTrend, defaultLoadData]);
 
   const highlights = insightsPlan?.highlights ?? [];
+
+  const clamp = (value: number, min = 0, max = 1) => Math.min(Math.max(value, min), max);
+
+  const signals = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+
+    const context = data.context || {};
+    const metrics = data.metrics || {};
+    const stressScore = data.stress?.score ?? 0;
+    const stressLabel = data.stress?.label ?? 'Calibrating';
+
+    const focusReadiness = metrics.focusReadiness ?? 0;
+    const cognitiveLoad = metrics.cognitiveLoad ?? 0;
+    const fatigue = metrics.fatigue ?? 0;
+    const bufferTime = metrics.bufferTime ?? 0;
+    const heartRate = context.heartRate ?? 72;
+    const unreadEmails = context.unreadEmails ?? 0;
+    const lastBreak = context.lastBreakMinutesAgo ?? 0;
+
+    return [
+      {
+        id: 'stress',
+        label: 'Stress score',
+        value: `${Math.round(stressScore * 100)}/100`,
+        detail: stressLabel,
+        intensity: clamp(stressScore)
+      },
+      {
+        id: 'focusReadiness',
+        label: 'Focus readiness',
+        value: `${Math.round(focusReadiness * 100)}%`,
+        detail: focusReadiness >= 0.6 ? 'Primed for deep work' : 'Protect focus windows',
+        intensity: clamp(1 - focusReadiness)
+      },
+      {
+        id: 'cognitiveLoad',
+        label: 'Cognitive load',
+        value: `${Math.round(cognitiveLoad * 100)}%`,
+        detail: cognitiveLoad >= 0.6 ? 'Load is high — add buffer' : 'Load manageable',
+        intensity: clamp(cognitiveLoad)
+      },
+      {
+        id: 'fatigue',
+        label: 'Fatigue',
+        value: `${Math.round(fatigue * 100)}%`,
+        detail: fatigue >= 0.5 ? 'Schedule recovery block' : 'Energy steady',
+        intensity: clamp(fatigue)
+      },
+      {
+        id: 'heartRate',
+        label: 'Heart rate',
+        value: `${heartRate} bpm`,
+        detail: 'Wearable stream',
+        intensity: clamp((heartRate - 60) / 50)
+      },
+      {
+        id: 'unreadEmails',
+        label: 'Unread emails',
+        value: `${unreadEmails}`,
+        detail: unreadEmails > 50 ? 'Triage recommended' : 'Inbox manageable',
+        intensity: clamp(unreadEmails / 80)
+      },
+      {
+        id: 'lastBreak',
+        label: 'Minutes since break',
+        value: `${lastBreak} min`,
+        detail: lastBreak > 90 ? 'Insert micro-break soon' : 'Break cadence healthy',
+        intensity: clamp(lastBreak / 150)
+      },
+      {
+        id: 'bufferTime',
+        label: 'Buffer time',
+        value: `${Math.round(bufferTime * 100)}%`,
+        detail: bufferTime < 0.3 ? 'Low buffer — protect time' : 'Solid margin available',
+        intensity: clamp(1 - bufferTime)
+      }
+    ];
+  }, [data]);
 
   const tasksByTab = useMemo(() => {
     const mapBucket = (bucket: AssistantTasksPlan[keyof AssistantTasksPlan] | undefined) =>
@@ -132,9 +212,28 @@ const SmartTaskList: React.FC = () => {
               </button>
             ))}
           </div>
-          
+
           <div className="divider"></div>
-          
+
+          {signals.length > 0 && (
+            <div className="signal-heatmap">
+              {signals.map((signal) => (
+                <div
+                  key={signal.id}
+                  className="signal-tile"
+                  style={{
+                    background: `linear-gradient(135deg, rgba(14, 165, 233, ${0.18 + signal.intensity * 0.45}), rgba(2, 132, 199, ${0.12 + signal.intensity * 0.35}))`,
+                    borderColor: `rgba(56, 189, 248, ${0.25 + signal.intensity * 0.3})`
+                  }}
+                >
+                  <span className="signal-label">{signal.label}</span>
+                  <span className="signal-value">{signal.value}</span>
+                  {signal.detail && <span className="signal-detail">{signal.detail}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="task-content">
             {loading && !data && (
               <div className="task-loading">Preparing your adaptive task list…</div>

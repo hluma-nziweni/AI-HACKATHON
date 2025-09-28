@@ -129,10 +129,6 @@
 
 /* Header */
 .header {
-  top: 20px;
-  left: 20px;
-  right: 20px;
-  max-width: calc(100% - 0px);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -140,23 +136,91 @@
   background-color: #ffffff;
   box-shadow: 0 8px 20px rgba(0,0,0,0.1);
   z-index: 50;
+  gap: 1.5rem;
 }
 
-.sidebar.collapsed ~ .main .header {
-  left: 20px;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
 }
 
-.header input {
-  width: 30%;
+.header-left input {
+  min-width: 220px;
+  max-width: 320px;
+  width: 100%;
   padding: 8px 12px;
   border: 1px solid #ccc;
   border-radius: 12px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #1d4ed8;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.status-chip .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.status-chip .status-score {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.status-chip.elevated {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #b45309;
+}
+
+.status-chip.critical {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #b91c1c;
 }
 
 .header .actions {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .header-left {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-left input {
+    max-width: 100%;
+  }
+
+  .header .actions {
+    align-self: stretch;
+    justify-content: flex-end;
+  }
 }
 
 .header .actions button {
@@ -358,10 +422,34 @@
   background-color: #444;
 }
 
+.dark-mode .status-chip {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #bfdbfe;
+}
+
+.dark-mode .status-chip.elevated {
+  background: rgba(245, 158, 11, 0.28);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fcd34d;
+}
+
+.dark-mode .status-chip.critical {
+  background: rgba(239, 68, 68, 0.32);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
+}
+
 .dark-mode .dropdown-menu {
   background-color: #1e1e1e;
   color: #e0e0e0;
   border: 1px solid #333;
+}
+
+.dark-mode .header-left input {
+  background-color: #111827;
+  border: 1px solid #374151;
+  color: #f3f4f6;
 }
 
 .dark-mode .dropdown-menu button:hover {
