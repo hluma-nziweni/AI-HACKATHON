@@ -1,8 +1,15 @@
 import os
 import requests
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Header
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
+from jose import jwt, JWTError
+from dotenv import load_dotenv, find_dotenv
+
+# Robust .env discovery (search up the tree) so devs can keep one root .env
+_dotenv_path = find_dotenv(usecwd=True)
+load_dotenv(_dotenv_path)
+print(f"[actions] Loaded .env from: {_dotenv_path or '(not found)'}")
 
 app = FastAPI(title="Actions Service")
 
@@ -10,13 +17,35 @@ app = FastAPI(title="Actions Service")
 # Use localhost for local development, Docker service name for containerized deployment
 INTEGRATIONS_SERVICE_URL = os.getenv("INTEGRATIONS_SERVICE_URL", "http://localhost:8001")
 
+JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("JWT_SECRET_KEY", "change-me-dev-secret")
+JWT_ALGO = os.getenv("JWT_ALGORITHM", "HS256")
+
+def _parse_bool(val: Optional[str], default: bool = False) -> bool:
+    if val is None:
+        return default
+    return str(val).strip().lower() in {"1", "true", "yes", "on"}
+
+AUTH_DISABLED = _parse_bool(os.getenv("AUTH_DISABLED"), default=False)
+
+def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization.split(" ", 1)[1]
+    return None
+
+def _validate_jwt(token: str) -> dict:
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+    except JWTError as e:
+        print(f"[actions] JWT decode failed: {e}")
+        raise HTTPException(status_code=401, detail="Invalid token") from e
+
 class ActionRequest(BaseModel):
     action: str
     user_token: Optional[str] = None
     details: Dict[str, Any] = {}
 
 @app.post("/api/v1/execute_action")
-async def execute_action(action_request: ActionRequest):
+async def execute_action(action_request: ActionRequest, authorization: Optional[str] = Header(None)):
     """
     Receives an action command from the Assistant Service and executes it.
     """
@@ -28,9 +57,16 @@ async def execute_action(action_request: ActionRequest):
         if not action_name:
             raise HTTPException(status_code=400, detail="Action name is required.")
 
+        # Require token via header or body
+        token = _extract_bearer(authorization) or user_token
+        if not token and not AUTH_DISABLED:
+            raise HTTPException(status_code=401, detail="Missing bearer token")
+        # Validate token if provided
+        if token:
+            _ = _validate_jwt(token)
         headers = {}
-        if user_token:
-            headers["Authorization"] = f"Bearer {user_token}"
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         
         # Dispatch the action based on the payload
         if action_name == "create_break_event":
@@ -83,6 +119,9 @@ async def execute_action(action_request: ActionRequest):
             "integration_response": integration_response
         }
 
+    except HTTPException:
+        # Preserve HTTP errors like 401 from our own checks
+        raise
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Timeout while communicating with Integrations Service")
     except requests.exceptions.ConnectionError:

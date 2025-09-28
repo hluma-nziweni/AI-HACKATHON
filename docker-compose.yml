@@ -22,6 +22,8 @@ services:
       - ./services/user:/app
     env_file:
       - ./services/user/.env
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-change-me-dev-secret}
 
   # The Integrations Service (FastAPI)
   integrations-service:
@@ -34,6 +36,10 @@ services:
       - ./services/integrations:/app
     env_file:
       - ./services/integrations/.env
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-change-me-dev-secret}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres-db:5432/harmonia}
+      - ALLOW_REQUEST_MOCKS=${ALLOW_REQUEST_MOCKS:-true}
 
   # The Assistant Service (FastAPI)
   assistant-service:
@@ -49,6 +55,10 @@ services:
     # The Assistant Service depends on the Integrations Service for data
     depends_on:
       - integrations-service
+    environment:
+      - INTEGRATIONS_SERVICE_URL=http://integrations-service:8001
+      - ACTIONS_SERVICE_URL=http://actions-service:8003
+      - JWT_SECRET=${JWT_SECRET:-change-me-dev-secret}
     
   # The Actions Service (FastAPI)
   actions-service:
@@ -65,3 +75,22 @@ services:
     depends_on:
       - integrations-service
       - assistant-service
+    environment:
+      - INTEGRATIONS_SERVICE_URL=http://integrations-service:8001
+      - JWT_SECRET=${JWT_SECRET:-change-me-dev-secret}
+
+  # Optional: Postgres for local dev/testing
+  postgres-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: harmonia
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+volumes:
+  pgdata:

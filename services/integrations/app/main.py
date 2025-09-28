@@ -9,13 +9,47 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 import requests
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from slack_sdk.webhook import WebhookClient
+from jose import jwt, JWTError
+import psycopg
 
-# Load environment variables from the .env file
-load_dotenv()
+# Robust .env discovery and logging
+_dotenv_path = find_dotenv(usecwd=True)
+load_dotenv(_dotenv_path)
+print(f"[integrations] Loaded .env from: {_dotenv_path or '(not found)'}")
 
 app = FastAPI(title="Integrations Service")
+
+JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("JWT_SECRET_KEY", "change-me-dev-secret")
+JWT_ALGO = os.getenv("JWT_ALGORITHM", "HS256")
+
+def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization.split(" ", 1)[1]
+    return None
+
+def _validate_jwt_dependency(authorization: Optional[str] = Header(None)) -> dict:
+    token = _extract_bearer(authorization)
+    if not token:
+        # Allow bypass when AUTH_DISABLED is enabled (demo mode)
+        try:
+            if AUTH_DISABLED:
+                return {"sub": "demo@example.com", "mode": "auth_bypass"}
+        except NameError:
+            # AUTH_DISABLED not defined yet in module load order
+            pass
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+    except JWTError as e:
+        # Also allow bypass on invalid token when AUTH_DISABLED
+        try:
+            if AUTH_DISABLED:
+                return {"sub": "demo@example.com", "mode": "auth_bypass"}
+        except NameError:
+            pass
+        raise HTTPException(status_code=401, detail="Invalid token") from e
 
 # Scopes for Google APIs
 SCOPES = [
@@ -28,6 +62,61 @@ SCOPES = [
 # A simple in-memory store for user credentials.
 # In a real application, this would be a database.
 credentials_store = {}
+
+def _parse_bool(val: Optional[str], default: bool = False) -> bool:
+    if val is None:
+        return default
+    return str(val).strip().lower() in {"1", "true", "yes", "on"}
+
+MOCK_MODE = _parse_bool(os.getenv("MOCK_MODE"), default=False)
+print(f"[integrations] MOCK_MODE raw='{os.getenv('MOCK_MODE')}' parsed={MOCK_MODE}")
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+ALLOW_REQUEST_MOCKS = _parse_bool(os.getenv("ALLOW_REQUEST_MOCKS"), default=True)
+AUTH_DISABLED = _parse_bool(os.getenv("AUTH_DISABLED"), default=False)
+print(f"[integrations] AUTH_DISABLED raw='{os.getenv('AUTH_DISABLED')}' parsed={AUTH_DISABLED}")
+
+def get_db_conn():
+    if not DATABASE_URL:
+        return None
+    try:
+        return psycopg.connect(DATABASE_URL)
+    except Exception as e:
+        print(f"[integrations] DB connect failed: {e}")
+        return None
+
+def resolve_scenario(claims: dict, override: Optional[str]) -> str:
+    """Return 'low'|'medium'|'high'. Order: override (if allowed) > DB demo_profiles > default 'medium'."""
+    if override and ALLOW_REQUEST_MOCKS:
+        if override in {"low", "medium", "high"}:
+            return override
+    if not DATABASE_URL:
+        return "medium"
+    user_identifier = claims.get("sub") or claims.get("email")
+    if not user_identifier:
+        return "medium"
+    conn = get_db_conn()
+    if not conn:
+        return "medium"
+    try:
+        with conn.cursor() as cur:
+            # Try to find by email (users.email stored in CITEXT)
+            cur.execute(
+                """
+                SELECT dp.scenario
+                FROM users u
+                JOIN demo_profiles dp ON dp.user_id = u.id
+                WHERE u.email = %s
+                """,
+                (user_identifier,)
+            )
+            row = cur.fetchone()
+            return row[0] if row else "medium"
+    except Exception as e:
+        print(f"[integrations] resolve_scenario error: {e}")
+        return "medium"
+    finally:
+        conn.close()
 
 # Pydantic models for request validation
 class CalendarEventRequest(BaseModel):
@@ -54,12 +143,19 @@ def get_credentials_from_token(authorization: Optional[str] = Header(None)):
         # In production, you'd validate the JWT and fetch user-specific credentials
         token = authorization.split(" ")[1]
         # TODO: Validate JWT token and get user_id
-        user_id = "user_id"  # This would come from the JWT
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+            user_id = payload.get("sub") or "user_id"
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Invalid token")
     else:
         user_id = "user_id"  # Fallback to default user
     
     creds = credentials_store.get(user_id)
     if not creds:
+        if MOCK_MODE:
+            # In mock mode, return a placeholder to allow handlers to proceed
+            return None
         raise HTTPException(status_code=401, detail="Not authenticated.")
     return creds
 
@@ -140,11 +236,40 @@ async def google_auth_callback(code: str, state: str):
     return {"message": "Authentication successful! You can now use the API."}
 
 @app.get("/api/v1/data/calendar")
-async def get_calendar_events(creds: Credentials = Depends(get_credentials)):
+async def get_calendar_events(creds: Optional[Credentials] = Depends(get_credentials_from_token), _claims: dict = Depends(_validate_jwt_dependency), scenario: Optional[str] = None):
     """
     Fetches the user's calendar events for the next 24 hours.
     """
     try:
+        if MOCK_MODE or creds is None:
+            scn = resolve_scenario(_claims, scenario)
+            # Synthetic events for the next few hours
+            now = datetime.datetime.now(datetime.timezone.utc)
+            # Adjust density by scenario
+            base = [
+                {
+                    'summary': 'Focus Work',
+                    'description': 'Deep work session',
+                    'start': {'dateTime': now.isoformat()},
+                    'end': {'dateTime': (now + datetime.timedelta(hours=1)).isoformat()},
+                },
+                {
+                    'summary': 'Team Standup',
+                    'description': 'Daily sync',
+                    'start': {'dateTime': (now + datetime.timedelta(hours=2)).isoformat()},
+                    'end': {'dateTime': (now + datetime.timedelta(hours=2, minutes=30)).isoformat()},
+                },
+            ]
+            extra = []
+            if scn == "high":
+                extra = [{
+                    'summary': 'Back-to-back Meetings',
+                    'description': 'High load',
+                    'start': {'dateTime': (now + datetime.timedelta(hours=3)).isoformat()},
+                    'end': {'dateTime': (now + datetime.timedelta(hours=5)).isoformat()},
+                }]
+            events = base + extra
+            return {"events": events}
         service = build('calendar', 'v3', credentials=creds)
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         events_result = service.events().list(
@@ -159,11 +284,32 @@ async def get_calendar_events(creds: Credentials = Depends(get_credentials)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/data/heart_rate")
-async def get_heart_rate(creds: Credentials = Depends(get_credentials)):
+async def get_heart_rate(creds: Optional[Credentials] = Depends(get_credentials_from_token), _claims: dict = Depends(_validate_jwt_dependency), scenario: Optional[str] = None):
     """
     Fetches heart rate data for the last 24 hours.
     """
     try:
+        if MOCK_MODE or creds is None:
+            scn = resolve_scenario(_claims, scenario)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            # Simple sinusoid-like variations
+            series = []
+            for i in range(12):
+                ts = (now - datetime.timedelta(hours=24 - 2*i)).isoformat()
+                if scn == "low":
+                    bpm = 62 + (i % 3) * 3
+                elif scn == "high":
+                    bpm = 85 + (i % 5) * 6
+                else:
+                    bpm = 72 + (i % 5) * 4
+                series.append({
+                    'startTimeNanos': 0,
+                    'endTimeNanos': 0,
+                    'dataTypeName': 'com.google.heart_rate.bpm',
+                    'originDataSourceId': 'mock',
+                    'value': [{'fpVal': float(bpm)}],
+                })
+            return {"heart_rate_data": series}
         service = build('fitness', 'v1', credentials=creds)
         end_time_micros = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000000)
         start_time_micros = end_time_micros - (24 * 60 * 60 * 1000000)
@@ -181,12 +327,12 @@ async def get_heart_rate(creds: Credentials = Depends(get_credentials)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/data/aggregate")
-async def get_all_user_data(creds: Credentials = Depends(get_credentials)):
+async def get_all_user_data(creds: Optional[Credentials] = Depends(get_credentials_from_token), _claims: dict = Depends(_validate_jwt_dependency), scenario: Optional[str] = None):
     """
     A single endpoint to get all data required by the Assistant Service.
     """
-    calendar_events = await get_calendar_events(creds=creds)
-    heart_rate_data = await get_heart_rate(creds=creds)
+    calendar_events = await get_calendar_events(creds=creds, _claims=_claims, scenario=scenario)
+    heart_rate_data = await get_heart_rate(creds=creds, _claims=_claims, scenario=scenario)
     
     # You can add more data points here
     
@@ -196,15 +342,74 @@ async def get_all_user_data(creds: Credentials = Depends(get_credentials)):
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
 
+class DemoProfileRequest(BaseModel):
+    scenario: str
+    mock_enabled: Optional[bool] = True
+
+@app.post("/admin/demo_profile")
+async def set_demo_profile(req: DemoProfileRequest, _claims: dict = Depends(_validate_jwt_dependency)):
+    if req.scenario not in {"low", "medium", "high"}:
+        raise HTTPException(status_code=400, detail="Invalid scenario")
+    if not DATABASE_URL:
+        raise HTTPException(status_code=500, detail="DATABASE_URL not configured")
+    user_email = _claims.get("sub") or _claims.get("email")
+    if not user_email:
+        raise HTTPException(status_code=400, detail="JWT missing sub/email")
+    try:
+        with psycopg.connect(DATABASE_URL) as conn, conn.cursor() as cur:
+            # Ensure user exists; create placeholder if not present (demo convenience)
+            cur.execute(
+                """
+                INSERT INTO users (email, password_hash)
+                VALUES (%s, 'placeholder')
+                ON CONFLICT (email) DO UPDATE SET updated_at = now()
+                RETURNING id
+                """,
+                (user_email,)
+            )
+            row = cur.fetchone()
+            user_id = row[0]
+            # Upsert demo profile
+            cur.execute(
+                """
+                INSERT INTO demo_profiles (user_id, mock_enabled, scenario, overrides)
+                VALUES (%s, %s, %s, NULL)
+                ON CONFLICT (user_id) DO UPDATE
+                SET mock_enabled = EXCLUDED.mock_enabled,
+                    scenario = EXCLUDED.scenario,
+                    updated_at = now()
+                """,
+                (user_id, bool(req.mock_enabled), req.scenario)
+            )
+            conn.commit()
+        return {"status": "ok", "scenario": req.scenario, "mock_enabled": bool(req.mock_enabled)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[integrations] set_demo_profile error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to set demo profile")
+
 @app.post("/api/v1/create_calendar_event")
 async def create_calendar_event(
     event_request: CalendarEventRequest, 
-    creds: Credentials = Depends(get_credentials_from_token)
+    creds: Optional[Credentials] = Depends(get_credentials_from_token),
+    _claims: dict = Depends(_validate_jwt_dependency)
 ):
     """
     Creates a calendar event for the user.
     """
     try:
+        if MOCK_MODE or creds is None:
+            start_time = datetime.datetime.now(datetime.timezone.utc)
+            end_time = start_time + datetime.timedelta(minutes=event_request.duration_minutes)
+            return {
+                "status": "mock_success",
+                "event_id": "mock-event-id",
+                "event_link": "http://example.com/mock",
+                "message": f"(MOCK) Event '{event_request.title}' would be created",
+                "start": start_time.isoformat(),
+                "end": end_time.isoformat(),
+            }
         service = build('calendar', 'v3', credentials=creds)
         
         # Calculate start and end times
@@ -238,12 +443,19 @@ async def create_calendar_event(
 @app.post("/api/v1/draft_email")
 async def draft_email(
     email_request: EmailRequest, 
-    creds: Credentials = Depends(get_credentials_from_token)
+    creds: Optional[Credentials] = Depends(get_credentials_from_token),
+    _claims: dict = Depends(_validate_jwt_dependency)
 ):
     """
     Creates a draft email using Gmail API.
     """
     try:
+        if MOCK_MODE or creds is None:
+            return {
+                "status": "mock_success",
+                "draft_id": "mock-draft-id",
+                "message": f"(MOCK) Draft email to {email_request.to} would be created"
+            }
         service = build('gmail', 'v1', credentials=creds)
         
         # Create the email message
@@ -271,7 +483,8 @@ async def draft_email(
 @app.post("/api/v1/send_slack_notification")
 async def send_slack_notification(
     notification_request: SlackNotificationRequest,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    _claims: dict = Depends(_validate_jwt_dependency)
 ):
     """
     Sends a Slack notification using webhook.
@@ -308,4 +521,14 @@ async def health_check():
     """
     Health check endpoint for service monitoring.
     """
-    return {"status": "healthy", "service": "integrations"}
+    return {
+        "status": "healthy",
+        "service": "integrations",
+        "mock_mode": MOCK_MODE,
+        "allow_request_mocks": ALLOW_REQUEST_MOCKS,
+        "auth_disabled": AUTH_DISABLED,
+        "env": {
+            "dotenv_path": _dotenv_path or None,
+            "db_configured": bool(DATABASE_URL)
+        }
+    }

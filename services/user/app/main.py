@@ -7,21 +7,24 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# Load environment variables from .env if present
-load_dotenv()
+# Load environment variables from nearest .env (searching up from CWD)
+_dotenv_path = find_dotenv(usecwd=True)
+load_dotenv(_dotenv_path)
+print(f"[user] Loaded .env from: {_dotenv_path or '(not found)'}")
 
 # In-memory "database" for MVP; replace with SQLAlchemy + SQLite/Postgres later
 fake_users_db = {}
 
 # Security settings (override via env in production)
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-dev-secret")
+# Support JWT_SECRET (shared across services) with fallback to legacy JWT_SECRET_KEY
+JWT_SECRET_KEY = os.getenv("JWT_SECRET") or os.getenv("JWT_SECRET_KEY", "change-me-dev-secret")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 app = FastAPI(title="User Service", version="0.1.0")

@@ -5,3 +5,4 @@ venv/
 node_modules/
 Project Description.md
 setup_services.ps1
+session_summary.md

@@ -2,8 +2,10 @@ import os
 import pickle
 import requests
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Header
 from pydantic import BaseModel, Field, validator
+from jose import jwt, JWTError
+from dotenv import load_dotenv, find_dotenv
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional
 
@@ -63,8 +65,11 @@ MODEL_FILE = os.path.join(SCRIPT_DIR, "ml_models", "decision_engine.pkl")
 class _RenameUnpickler(pickle.Unpickler):
     def find_class(self, module, name):
         if module == "__main__" and name == "DecisionEngine":
-            # Defer import to runtime to avoid import cycles
-            from app.engine_runtime import DecisionEngine as RuntimeDecisionEngine  # type: ignore
+            # Defer import to runtime; support both package and local module imports
+            try:
+                from app.engine_runtime import DecisionEngine as RuntimeDecisionEngine  # type: ignore
+            except Exception:
+                from engine_runtime import DecisionEngine as RuntimeDecisionEngine  # type: ignore
             return RuntimeDecisionEngine
         return super().find_class(module, name)
 
@@ -81,6 +86,10 @@ except FileNotFoundError:
 except Exception as e:
     print(f"Error loading ML model via remapped unpickler: {e}. NOT creating fallback.")
 
+_dotenv_path = find_dotenv(usecwd=True)
+load_dotenv(_dotenv_path)
+print(f"[assistant] Loaded .env from: {_dotenv_path or '(not found)'}")
+
 app = FastAPI(
     title="Harmonia Assistant Service",
     description="AI-powered holistic assistant that analyzes user data and provides personalized wellness recommendations",
@@ -95,15 +104,42 @@ class RecommendationRequest(BaseModel):
     """
     Request model for getting AI-powered wellness recommendations.
     """
-    user_token: str
+    # Deprecated: prefer Authorization header
+    user_token: Optional[str] = None
     user_id: Optional[str] = None
     context: Optional[Dict[str, Any]] = {}
+    # Optional scenario override: 'low' | 'medium' | 'high'
+    scenario: Optional[str] = Field(default=None, description="Mock scenario override for Integrations")
     
     @validator('user_token')
     def validate_user_token(cls, v):
-        if not v or len(v.strip()) == 0:
-            raise ValueError('user_token cannot be empty')
+        if v is None:
+            return v
+        if len(v.strip()) == 0:
+            raise ValueError('user_token cannot be empty if provided')
         return v.strip()
+
+# --- JWT Utilities ---
+JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("JWT_SECRET_KEY", "change-me-dev-secret")
+JWT_ALGO = os.getenv("JWT_ALGORITHM", "HS256")
+
+def _parse_bool(val: Optional[str], default: bool = False) -> bool:
+    if val is None:
+        return default
+    return str(val).strip().lower() in {"1", "true", "yes", "on"}
+
+AUTH_DISABLED = _parse_bool(os.getenv("AUTH_DISABLED"), default=False)
+
+def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization.split(" ", 1)[1]
+    return None
+
+def _validate_jwt(token: str) -> dict:
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail="Invalid token") from e
 
 class ActionDetails(BaseModel):
     """
@@ -403,7 +439,7 @@ def extract_steps_from_fitness_data(heart_rate_data: List[Dict]) -> float:
     else:
         return 2000.0  # Low activity
 
-def fetch_emails_for_urgency_analysis(user_token: str) -> List[str]:
+def fetch_emails_for_urgency_analysis(user_token: str, scenario: Optional[str] = None) -> List[str]:
     """
     Fetch recent emails from Gmail API for urgency analysis.
     Returns a list of email text (subject + body) for NLP processing.
@@ -413,11 +449,10 @@ def fetch_emails_for_urgency_analysis(user_token: str) -> List[str]:
         
         # For now, we'll extract email information from calendar events
         # In a full implementation, you'd call Gmail API directly
-        response = requests.get(
-            f"{INTEGRATIONS_SERVICE_URL}/api/v1/data/calendar",
-            headers=headers,
-            timeout=10
-        )
+        url = f"{INTEGRATIONS_SERVICE_URL}/api/v1/data/calendar"
+        if scenario:
+            url += f"?scenario={scenario}"
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         calendar_data = response.json()
         
@@ -518,27 +553,39 @@ def analyze_email_urgency_keywords(emails: List[str]) -> float:
     summary="Get AI Wellness Recommendation",
     description="Analyzes user data and provides personalized wellness recommendations based on stress levels and activity patterns."
 )
-async def get_recommendation(request: RecommendationRequest):
+async def get_recommendation(request: RecommendationRequest, authorization: Optional[str] = Header(None), x_scenario: Optional[str] = Header(default=None, alias="X-Scenario")):
     """
     1. Fetches real-time data from the Integrations Service.
     2. Runs the Decision Engine (ML Model) to get a prediction.
     3. Dispatches the resulting action to the Actions Service.
     """
-    if not DECISION_ENGINE:
-        raise HTTPException(status_code=503, detail="ML Model not loaded.")
+    # If the ML model isn't loaded, we'll use a heuristic fallback instead of failing.
 
     try:
-        # 1. FETCH DATA from INTEGRATIONS SERVICE
-        # Extract validated data from request model
-        user_token = request.user_token
+        # 1. AUTH: prefer Authorization header, fallback to legacy body field
+        user_token = _extract_bearer(authorization) or (request.user_token or None)
+        if not user_token and not AUTH_DISABLED:
+            raise HTTPException(status_code=401, detail="Missing bearer token")
+        # Validate JWT locally if provided (and not disabled)
+        if user_token:
+            _ = _validate_jwt(user_token)
 
-        headers = {"Authorization": f"Bearer {user_token}"}
+        headers = {}
+        if user_token:
+            headers["Authorization"] = f"Bearer {user_token}"
         
-        # Call the aggregate endpoint for all user data
-        data_response = requests.get(
-            f"{INTEGRATIONS_SERVICE_URL}/api/v1/data/aggregate",
-            headers=headers
-        )
+        # Determine scenario override (accept header X-Scenario too)
+        scenario_override = None
+        # Header takes precedence if valid
+        if x_scenario in {"low", "medium", "high"}:
+            scenario_override = x_scenario
+        elif request.scenario in {"low", "medium", "high"}:
+            scenario_override = request.scenario
+        # Call the aggregate endpoint for all user data (forward scenario if provided)
+        agg_url = f"{INTEGRATIONS_SERVICE_URL}/api/v1/data/aggregate"
+        if scenario_override:
+            agg_url += f"?scenario={scenario_override}"
+        data_response = requests.get(agg_url, headers=headers)
         data_response.raise_for_status()
         raw_user_data = data_response.json()
 
@@ -556,14 +603,14 @@ async def get_recommendation(request: RecommendationRequest):
         features_df = pd.DataFrame([model_input_data], columns=required_features)
 
         # 3. MAKE PREDICTION
-        # Prefer the model's native predict; otherwise adapt to the notebook engine
+        # Prefer the model's native predict; otherwise adapt or use a heuristic fallback
         stress_level = None
         try:
-            if hasattr(DECISION_ENGINE, 'predict') and callable(getattr(DECISION_ENGINE, 'predict')):
+            if DECISION_ENGINE and hasattr(DECISION_ENGINE, 'predict') and callable(getattr(DECISION_ENGINE, 'predict')):
                 # Use predict if available
                 prediction = DECISION_ENGINE.predict(features_df)[0]
                 stress_level = int(prediction)
-            elif hasattr(DECISION_ENGINE, 'stress_model') and getattr(DECISION_ENGINE, 'stress_model') is not None:
+            elif DECISION_ENGINE and hasattr(DECISION_ENGINE, 'stress_model') and getattr(DECISION_ENGINE, 'stress_model') is not None:
                 # Prefer the model's own expected feature names if available
                 sm = DECISION_ENGINE.stress_model
                 if hasattr(sm, 'feature_names_in_'):
@@ -600,9 +647,9 @@ async def get_recommendation(request: RecommendationRequest):
                     stress_level = int(prediction)
                 else:
                     raise RuntimeError('stress_model lacks feature metadata')
-            elif callable(DECISION_ENGINE):
+            elif DECISION_ENGINE and callable(DECISION_ENGINE):
                 # Last resort: call engine(email_text, stress_features)
-                emails = fetch_emails_for_urgency_analysis(user_token)
+                emails = fetch_emails_for_urgency_analysis(user_token, scenario_override)
                 email_text = emails[0] if emails else "SUBJECT: (none) BODY: (none)"
                 stress_features = {
                     'Sleep_Duration': float(model_input_data.get('Sleep_Duration', 7.0)),
@@ -617,7 +664,17 @@ async def get_recommendation(request: RecommendationRequest):
                     raise RuntimeError('Engine returned invalid result payload')
                 stress_level = int(result_obj['stress_level'])
             else:
-                raise RuntimeError('Loaded engine has no usable predict interface')
+                # Heuristic fallback when no model is available
+                hr = float(model_input_data.get('HeartRate_Avg', 70.0))
+                busy = float(model_input_data.get('Calendar_Busy_Hours', 0.0))
+                urgent = float(model_input_data.get('Urgent_Emails_Flag', 0.0))
+                sleep = float(model_input_data.get('Sleep_Duration', 7.0))
+                score = 0
+                score += 3 if hr >= 85 else (2 if hr >= 75 else 1)
+                score += 3 if busy >= 6 else (2 if busy >= 3 else 1)
+                score += 2 if urgent >= 0.5 else 0
+                score += 0 if sleep >= 7 else 2
+                stress_level = max(0, min(10, int(round(score + 2))))
         except Exception as pred_err:
             raise HTTPException(status_code=503, detail=f"ML prediction failed: {pred_err}")
         
@@ -696,10 +753,9 @@ async def health_check():
         }
     else:
         health_status["checks"]["ml_model"] = {
-            "status": "unhealthy", 
-            "message": "Decision engine not loaded"
+            "status": "degraded",
+            "message": "Decision engine not loaded - using heuristic fallback"
         }
-        overall_healthy = False
     
     # Check 2: NLP Capabilities
     if TRANSFORMERS_AVAILABLE:
