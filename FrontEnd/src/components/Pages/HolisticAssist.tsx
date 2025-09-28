@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -13,134 +13,9 @@ import {
   Zap
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import config from '../../config';
 import './HolisticAssist.css';
 
-type AssistantContext = {
-  displayName?: string;
-  heartRate: number;
-  hrv: number;
-  calendarLoad: number;
-  unreadEmails: number;
-  sleepQuality: number;
-  stepsToday: number;
-  lastBreakMinutesAgo: number;
-  sentimentScore: number;
-  focusEnergy?: number;
-  hydration?: number;
-  meetings?: Array<{
-    id: string;
-    title: string;
-    start: number | string;
-    durationMinutes: number;
-    category?: string;
-    priority?: string;
-    location?: string;
-  }>;
-  focusBlocks?: Array<{
-    id: string;
-    title: string;
-    start: number | string;
-    durationMinutes: number;
-    mode?: string;
-  }>;
-  notifications?: {
-    pending?: number;
-    urgent?: number;
-  };
-};
-
-type AssistantStress = {
-  score: number;
-  level: 'steady' | 'elevated' | 'critical';
-  label: string;
-  headline: string;
-  rationale: string[];
-  signals: {
-    heartRate: number;
-    heartRateVariability: number;
-    unreadEmails: number;
-    calendarLoad: number;
-    lastBreakMinutesAgo: number;
-    sleepQuality: number;
-  };
-};
-
-type Recommendation = {
-  id: string;
-  title: string;
-  description: string;
-  impact: string;
-  category: string;
-  timeframe: string;
-};
-
-type Automation = {
-  id: string;
-  title: string;
-  detail: string;
-  status: string;
-  type: string;
-};
-
-type FocusWindow = {
-  id: string;
-  title: string;
-  start: number;
-  end?: number;
-  durationMinutes?: number;
-  mode?: string;
-  readiness?: number;
-};
-
-type FocusSchedule = {
-  nextFocusBlock: FocusWindow | null;
-  nextRecoveryBlock: {
-    id: string;
-    title: string;
-    start: number;
-    durationMinutes: number;
-    focus: string;
-  };
-  suppressedNotifications: {
-    until: number;
-    count: number;
-  };
-};
-
-type TimelineItem = {
-  id: string;
-  timeLabel: string;
-  label: string;
-  type: string;
-  status: string;
-  detail: string;
-};
-
-type AssistantMetrics = {
-  cognitiveLoad: number;
-  fatigue: number;
-  focusReadiness: number;
-  bufferTime: number;
-};
-
-type AssistantLLM = {
-  enabled: boolean;
-  used: boolean;
-  notes: string[];
-};
-
-type AssistantState = {
-  timestamp: string;
-  context: AssistantContext;
-  stress: AssistantStress;
-  metrics: AssistantMetrics;
-  recommendations: Recommendation[];
-  automations: Automation[];
-  focusSchedule: FocusSchedule;
-  timeline: TimelineItem[];
-  llm?: AssistantLLM;
-};
+import { useAssistantData } from '../../context/AssistantContext';
 
 type ContextForm = {
   heartRate: number;
@@ -172,10 +47,18 @@ type Toast = {
 };
 
 const HolisticAssistant: React.FC = () => {
-  const [assistantState, setAssistantState] = useState<AssistantState | null>(null);
+  const {
+    data: assistantState,
+    loading: summaryLoading,
+    error: summaryError,
+    refresh,
+    analyze,
+    scenarios,
+    runScenario
+  } = useAssistantData();
   const [form, setForm] = useState<ContextForm>(defaultForm);
-  const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [scenarioLoading, setScenarioLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formInitialised, setFormInitialised] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -183,8 +66,6 @@ const HolisticAssistant: React.FC = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
-
-  const backendBaseUrl = config.BACKEND_URL.replace(/\/$/, '');
 
   const toPercent = (value: number | undefined) => {
     if (typeof value !== 'number' || Number.isNaN(value)) return 0;
@@ -198,34 +79,6 @@ const HolisticAssistant: React.FC = () => {
     return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   };
 
-  const fetchSummary = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${backendBaseUrl}/api/assistant/summary`, {
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error('Unable to fetch assistant summary');
-      }
-
-      const json = await response.json();
-      setFormInitialised(false);
-      setAssistantState(json.data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      setToast({ type: 'error', message: 'We could not sync the latest signals. Please retry.' });
-      setShowToast(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [backendBaseUrl]);
-
-  useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
-
   useEffect(() => {
     const stateToast = (location.state as { toast?: Toast })?.toast;
     if (stateToast) {
@@ -234,6 +87,14 @@ const HolisticAssistant: React.FC = () => {
       navigate(location.pathname, { replace: true });
     }
   }, [location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (summaryError) {
+      setToast({ type: 'error', message: summaryError });
+      setShowToast(true);
+      setError(summaryError);
+    }
+  }, [summaryError]);
 
   useEffect(() => {
     if (!showToast) return;
@@ -270,21 +131,8 @@ const HolisticAssistant: React.FC = () => {
   const handleAnalyze = async () => {
     setAnalyzing(true);
     try {
-      const response = await fetch(`${backendBaseUrl}/api/assistant/analyze`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ context: form })
-      });
-
-      if (!response.ok) {
-        throw new Error('Unable to generate recommendations');
-      }
-
-      const json = await response.json();
-      setAssistantState(json.data);
+      await analyze({ context: form });
+      setFormInitialised(false);
       setError(null);
       setToast({ type: 'success', message: 'Adaptive plan refreshed in real-time.' });
       setShowToast(true);
@@ -295,6 +143,24 @@ const HolisticAssistant: React.FC = () => {
       setShowToast(true);
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleScenarioRun = async (key: string) => {
+    setScenarioLoading(key);
+    try {
+      await runScenario(key);
+      setFormInitialised(false);
+      setError(null);
+      setToast({ type: 'success', message: `Scenario “${key}” loaded.` });
+      setShowToast(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to load scenario';
+      setError(message);
+      setToast({ type: 'error', message });
+      setShowToast(true);
+    } finally {
+      setScenarioLoading(null);
     }
   };
 
@@ -355,6 +221,24 @@ const HolisticAssistant: React.FC = () => {
           <p className="control-description">
             Adjust the inputs below to simulate your current load. Harmonia recomputes stress, cognitive load, and interventions instantly.
           </p>
+          {scenarios.length > 0 && (
+            <div className="demo-scenarios">
+              <span className="demo-label">Demo scenarios:</span>
+              <div className="demo-chips">
+                {scenarios.map((scenario) => (
+                  <button
+                    key={scenario.id}
+                    className={`demo-chip ${scenarioLoading === scenario.id ? 'loading' : ''}`}
+                    onClick={() => handleScenarioRun(scenario.id)}
+                    disabled={summaryLoading || analyzing || scenarioLoading === scenario.id}
+                    title={scenario.description}
+                  >
+                    {scenarioLoading === scenario.id ? 'Loading…' : scenario.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="control-grid">
             <div className="control-field">
               <label>Heart Rate</label>
@@ -461,7 +345,17 @@ const HolisticAssistant: React.FC = () => {
             <button className="cyber-button" onClick={handleAnalyze} disabled={analyzing}>
               {analyzing ? 'Synthesising plan…' : 'Run Adaptive Plan'}
             </button>
-            <button className="cyber-button ghost" onClick={fetchSummary} disabled={loading}>
+            <button
+              className="cyber-button ghost"
+              onClick={() => {
+                refresh().then(() => {
+                  setError(null);
+                  setToast({ type: 'info', message: 'Resynced live signals from your workspace.' });
+                  setShowToast(true);
+                }).catch(() => {});
+              }}
+              disabled={summaryLoading}
+            >
               Reset to live feed
             </button>
           </div>
@@ -512,7 +406,7 @@ const HolisticAssistant: React.FC = () => {
         </div>
       </section>
 
-      {loading ? (
+      {summaryLoading ? (
         <div className="loading-state">
           <PauseCircle size={24} />
           <span>Syncing with calendar, inbox, and wearable streams…</span>
@@ -662,7 +556,7 @@ const HolisticAssistant: React.FC = () => {
         </div>
       )}
 
-      {!loading && (
+      {!summaryLoading && (
         <section className="timeline-section">
           <div className="timeline-header">
             <CalendarIcon size={20} />

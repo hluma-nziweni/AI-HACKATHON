@@ -244,6 +244,55 @@
   font-size: 0.9rem;
 }
 
+.demo-scenarios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.demo-label {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(196, 220, 255, 0.7);
+}
+
+.demo-chips {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.demo-chip {
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 255, 255, 0.35);
+  background: rgba(0, 255, 255, 0.12);
+  color: rgba(225, 244, 255, 0.9);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.demo-chip:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: rgba(0, 255, 255, 0.2);
+  box-shadow: 0 12px 20px rgba(0, 255, 255, 0.2);
+}
+
+.demo-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.demo-chip.loading {
+  background: rgba(0, 255, 255, 0.18);
+  border-color: rgba(0, 255, 255, 0.45);
+}
+
 .control-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

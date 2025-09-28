@@ -148,6 +148,48 @@
   border-top: 1px solid #f0f0f0;
 }
 
+.calendar-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(66, 133, 244, 0.08);
+  border: 1px solid rgba(66, 133, 244, 0.12);
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin-bottom: 12px;
+  color: #2c5282;
+  font-size: 0.875rem;
+}
+
+.highlights-card {
+  margin-top: -1rem;
+  background: #f9fbff;
+}
+
+.highlights-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.highlights-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.highlights-list li {
+  padding: 0.6rem 0.8rem;
+  background: rgba(66, 133, 244, 0.08);
+  border-radius: 8px;
+  border: 1px solid rgba(66, 133, 244, 0.12);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #1a365d;
+}
+
 .legend-item {
   display: flex;
   align-items: center;
@@ -238,4 +280,20 @@
 
 .dark-mode .legend-item {
   color: #aaa;
+}
+
+.dark-mode .calendar-loading {
+  background: rgba(66, 133, 244, 0.15);
+  border-color: rgba(66, 133, 244, 0.25);
+  color: #cfe1ff;
+}
+
+.dark-mode .highlights-card {
+  background: #212735;
+}
+
+.dark-mode .highlights-list li {
+  background: rgba(66, 133, 244, 0.2);
+  border-color: rgba(66, 133, 244, 0.25);
+  color: #e4edff;
 }

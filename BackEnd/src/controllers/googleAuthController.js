@@ -35,7 +35,7 @@ const googleCallback = (req, res, next) => {
       setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
       // Redirect to frontend with success
-      res.redirect(`${process.env.FRONTEND_URL}/holistic`);
+      res.redirect(`${process.env.FRONTEND_URL}/beat`);
 
     } catch (error) {
       console.error('Google callback error:', error);

@@ -87,7 +87,7 @@ const SignIn: React.FC = () => {
 
       if (response.ok) {
         console.log('Signin successful:', data);
-        navigate('/holistic', {
+        navigate('/home', {
           state: {
             toast: {
               type: 'success',

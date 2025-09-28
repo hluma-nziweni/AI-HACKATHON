@@ -1,4 +1,8 @@
-const { buildAssistantState } = require('../services/assistantService');
+const {
+  buildAssistantState,
+  getDemoScenarios,
+  getDemoScenarioContext
+} = require('../services/assistantService');
 
 const getSummary = async (req, res) => {
   try {
@@ -24,7 +28,36 @@ const analyzeContext = async (req, res) => {
   }
 };
 
+const listScenarios = (req, res) => {
+  try {
+    const scenarios = getDemoScenarios();
+    res.json({ success: true, data: scenarios });
+  } catch (error) {
+    console.error('Assistant scenario list error:', error);
+    res.status(500).json({ success: false, error: 'Unable to load scenarios' });
+  }
+};
+
+const runScenario = async (req, res) => {
+  try {
+    const { key } = req.params;
+    const scenarioContext = getDemoScenarioContext(key);
+
+    if (!scenarioContext) {
+      return res.status(404).json({ success: false, error: 'Scenario not found' });
+    }
+
+    const state = await buildAssistantState({ context: scenarioContext });
+    res.json({ success: true, data: state, meta: { scenario: key } });
+  } catch (error) {
+    console.error('Assistant scenario error:', error);
+    res.status(500).json({ success: false, error: 'Unable to build scenario state' });
+  }
+};
+
 module.exports = {
   getSummary,
-  analyzeContext
+  analyzeContext,
+  listScenarios,
+  runScenario
 };
