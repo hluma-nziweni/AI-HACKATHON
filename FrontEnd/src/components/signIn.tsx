@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import config from "../config";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 // Type definitions
 interface FormData {
@@ -22,6 +22,7 @@ const SignIn: React.FC = () => {
   });
   const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setIsVisible(true);
@@ -75,6 +76,7 @@ const SignIn: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
@@ -82,13 +84,19 @@ const SignIn: React.FC = () => {
       });
       
       const data = await response.json();
-      
+
       if (response.ok) {
-        // Handle successful signin - redirect or update app state
         console.log('Signin successful:', data);
-        // You might want to store tokens, redirect, etc.
+        navigate('/holistic', {
+          state: {
+            toast: {
+              type: 'success',
+              message: `Welcome back${data?.user?.name ? `, ${data.user.name.split(' ')[0]}` : ''}! Harmonia is calibrating your day.`,
+            }
+          }
+        });
       } else {
-        setErrors({ submit: data.message || 'Authentication failed' });
+        setErrors({ submit: data.error || data.message || 'Authentication failed' });
       }
     } catch (error) {
       setErrors({ submit: 'Network error. Please try again.' });

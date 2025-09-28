@@ -17,12 +17,12 @@ const googleCallback = (req, res, next) => {
     try {
       if (err) {
         console.error('Google auth error:', err);
-        return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_error`);
+        return res.redirect(`${process.env.FRONTEND_URL}/signin?error=oauth_error`);
       }
 
       if (!user) {
         console.error('No user returned from Google auth');
-        return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed`);
+        return res.redirect(`${process.env.FRONTEND_URL}/signin?error=oauth_failed`);
       }
 
       // Generate JWT tokens
@@ -35,11 +35,11 @@ const googleCallback = (req, res, next) => {
       setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
       // Redirect to frontend with success
-      res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+      res.redirect(`${process.env.FRONTEND_URL}/holistic`);
 
     } catch (error) {
       console.error('Google callback error:', error);
-      res.redirect(`${process.env.FRONTEND_URL}/login?error=server_error`);
+      res.redirect(`${process.env.FRONTEND_URL}/signin?error=server_error`);
     }
   })(req, res, next);
 };

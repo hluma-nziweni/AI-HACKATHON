@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
+const assistantRoutes = require('./routes/assistant');
 const passport = require('./config/passport');
 const app = express();
 
@@ -39,6 +40,7 @@ app.use(passport.initialize());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/assistant', assistantRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Harmonai is running!', timestamp: new Date().toISOString() });

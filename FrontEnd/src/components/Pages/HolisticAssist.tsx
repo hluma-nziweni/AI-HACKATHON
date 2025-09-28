@@ -1,169 +1,694 @@
-import React, { useState, useEffect } from 'react';
-import { Brain, Heart, Zap, Clock, Calendar, Mail, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Activity,
+  AlertCircle,
+  Brain,
+  Calendar as CalendarIcon,
+  CheckCircle,
+  Clock,
+  Heart,
+  Mail,
+  PauseCircle,
+  Sparkles,
+  Zap
+} from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import config from '../../config';
 import './HolisticAssist.css';
 
+type AssistantContext = {
+  displayName?: string;
+  heartRate: number;
+  hrv: number;
+  calendarLoad: number;
+  unreadEmails: number;
+  sleepQuality: number;
+  stepsToday: number;
+  lastBreakMinutesAgo: number;
+  sentimentScore: number;
+  focusEnergy?: number;
+  hydration?: number;
+  meetings?: Array<{
+    id: string;
+    title: string;
+    start: number | string;
+    durationMinutes: number;
+    category?: string;
+    priority?: string;
+    location?: string;
+  }>;
+  focusBlocks?: Array<{
+    id: string;
+    title: string;
+    start: number | string;
+    durationMinutes: number;
+    mode?: string;
+  }>;
+  notifications?: {
+    pending?: number;
+    urgent?: number;
+  };
+};
+
+type AssistantStress = {
+  score: number;
+  level: 'steady' | 'elevated' | 'critical';
+  label: string;
+  headline: string;
+  rationale: string[];
+  signals: {
+    heartRate: number;
+    heartRateVariability: number;
+    unreadEmails: number;
+    calendarLoad: number;
+    lastBreakMinutesAgo: number;
+    sleepQuality: number;
+  };
+};
+
+type Recommendation = {
+  id: string;
+  title: string;
+  description: string;
+  impact: string;
+  category: string;
+  timeframe: string;
+};
+
+type Automation = {
+  id: string;
+  title: string;
+  detail: string;
+  status: string;
+  type: string;
+};
+
+type FocusWindow = {
+  id: string;
+  title: string;
+  start: number;
+  end?: number;
+  durationMinutes?: number;
+  mode?: string;
+  readiness?: number;
+};
+
+type FocusSchedule = {
+  nextFocusBlock: FocusWindow | null;
+  nextRecoveryBlock: {
+    id: string;
+    title: string;
+    start: number;
+    durationMinutes: number;
+    focus: string;
+  };
+  suppressedNotifications: {
+    until: number;
+    count: number;
+  };
+};
+
+type TimelineItem = {
+  id: string;
+  timeLabel: string;
+  label: string;
+  type: string;
+  status: string;
+  detail: string;
+};
+
+type AssistantMetrics = {
+  cognitiveLoad: number;
+  fatigue: number;
+  focusReadiness: number;
+  bufferTime: number;
+};
+
+type AssistantLLM = {
+  enabled: boolean;
+  used: boolean;
+  notes: string[];
+};
+
+type AssistantState = {
+  timestamp: string;
+  context: AssistantContext;
+  stress: AssistantStress;
+  metrics: AssistantMetrics;
+  recommendations: Recommendation[];
+  automations: Automation[];
+  focusSchedule: FocusSchedule;
+  timeline: TimelineItem[];
+  llm?: AssistantLLM;
+};
+
+type ContextForm = {
+  heartRate: number;
+  hrv: number;
+  calendarLoad: number;
+  unreadEmails: number;
+  sleepQuality: number;
+  stepsToday: number;
+  lastBreakMinutesAgo: number;
+  sentimentScore: number;
+  hydration: number;
+};
+
+const defaultForm: ContextForm = {
+  heartRate: 80,
+  hrv: 50,
+  calendarLoad: 0.75,
+  unreadEmails: 30,
+  sleepQuality: 0.7,
+  stepsToday: 2500,
+  lastBreakMinutesAgo: 60,
+  sentimentScore: -0.1,
+  hydration: 0.6
+};
+
+type Toast = {
+  message: string;
+  type: 'success' | 'error' | 'info';
+};
+
 const HolisticAssistant: React.FC = () => {
-  const [heartRate, setHeartRate] = useState(72);
-  const [isAnimating, setIsAnimating] = useState(true);
+  const [assistantState, setAssistantState] = useState<AssistantState | null>(null);
+  const [form, setForm] = useState<ContextForm>(defaultForm);
+  const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [formInitialised, setFormInitialised] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [showToast, setShowToast] = useState(false);
 
-  // Simulate heart rate monitor
-  useEffect(() => {
-    if (!isAnimating) return;
+  const location = useLocation();
+  const navigate = useNavigate();
 
-    const interval = setInterval(() => {
-      setHeartRate(prev => {
-        const variation = Math.random() * 10 - 5; // -5 to +5 variation
-        return Math.max(60, Math.min(100, Math.round(prev + variation)));
+  const backendBaseUrl = config.BACKEND_URL.replace(/\/$/, '');
+
+  const toPercent = (value: number | undefined) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return 0;
+    return Math.round(value * 100);
+  };
+
+  const formatTime = (value: number | string | undefined) => {
+    if (!value) return '--';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '--';
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  };
+
+  const fetchSummary = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/assistant/summary`, {
+        credentials: 'include'
       });
-    }, 1000);
 
-    return () => clearInterval(interval);
-  }, [isAnimating]);
+      if (!response.ok) {
+        throw new Error('Unable to fetch assistant summary');
+      }
 
-  const priorities = [
-    { icon: Calendar, text: "Meeting with John", badge: "high urgency - Q3 report" },
-    { icon: Mail, text: "Draft marketing email", suggestion: "AI suggests doing this while focused" },
-    { icon: FileText, text: "Review Project X Proposal" },
-    { icon: CheckCircle, text: "Submit weekly report", badge: "due today" },
-    { icon: AlertCircle, text: "Team sync call", badge: "10:30 AM" }
-  ];
+      const json = await response.json();
+      setFormInitialised(false);
+      setAssistantState(json.data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      setToast({ type: 'error', message: 'We could not sync the latest signals. Please retry.' });
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [backendBaseUrl]);
 
-  const suggestions = [
-    { icon: Clock, text: "Take a 15-min walk", detail: "Scheduled for 2 PM" },
-    { icon: Mail, text: "Respond to Sarah", detail: "AI has drafted response" },
-    { icon: CheckCircle, text: "Confirm meeting room", detail: "For 3 PM conference" },
-    { icon: FileText, text: "Review draft proposal", detail: "Send feedback by EOD" },
-    { icon: Zap, text: "Optimize workflow", detail: "AI recommendations ready" }
-  ];
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
+
+  useEffect(() => {
+    const stateToast = (location.state as { toast?: Toast })?.toast;
+    if (stateToast) {
+      setToast(stateToast);
+      setShowToast(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (!showToast) return;
+    const timer = setTimeout(() => {
+      setShowToast(false);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [showToast]);
+
+  useEffect(() => {
+    if (assistantState && !formInitialised) {
+      const context = assistantState.context;
+      setForm({
+        heartRate: Math.round(context.heartRate ?? defaultForm.heartRate),
+        hrv: Math.round(context.hrv ?? defaultForm.hrv),
+        calendarLoad: context.calendarLoad ?? defaultForm.calendarLoad,
+        unreadEmails: context.unreadEmails ?? defaultForm.unreadEmails,
+        sleepQuality: context.sleepQuality ?? defaultForm.sleepQuality,
+        stepsToday: context.stepsToday ?? defaultForm.stepsToday,
+        lastBreakMinutesAgo: context.lastBreakMinutesAgo ?? defaultForm.lastBreakMinutesAgo,
+        sentimentScore: context.sentimentScore ?? defaultForm.sentimentScore,
+        hydration: context.hydration ?? defaultForm.hydration
+      });
+      setFormInitialised(true);
+    }
+  }, [assistantState, formInitialised]);
+
+  const handleRangeChange = (key: keyof ContextForm, transform?: (value: number) => number) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = Number(event.target.value);
+    const nextValue = transform ? transform(rawValue) : rawValue;
+    setForm((prev) => ({ ...prev, [key]: nextValue }));
+  };
+
+  const handleAnalyze = async () => {
+    setAnalyzing(true);
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/assistant/analyze`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ context: form })
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to generate recommendations');
+      }
+
+      const json = await response.json();
+      setAssistantState(json.data);
+      setError(null);
+      setToast({ type: 'success', message: 'Adaptive plan refreshed in real-time.' });
+      setShowToast(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+      setToast({ type: 'error', message: message || 'Unable to generate recommendations' });
+      setShowToast(true);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const stressScore = assistantState?.stress?.score ?? 0;
+  const stressPercent = useMemo(() => toPercent(stressScore), [stressScore]);
+  const levelTag = assistantState?.stress?.level ?? 'steady';
+
+  const metrics = assistantState?.metrics;
+  const recommendations = assistantState?.recommendations ?? [];
+  const automations = assistantState?.automations ?? [];
+  const timeline = assistantState?.timeline ?? [];
+  const focusSchedule = assistantState?.focusSchedule;
+  const stressSignals = assistantState?.stress?.signals;
+  const stressRationale = assistantState?.stress?.rationale ?? [];
+  const llmInfo = assistantState?.llm;
+  const hasRecommendations = recommendations.length > 0;
+  const hasTimeline = timeline.length > 0;
 
   return (
     <div className="holistic-assistant">
-      <div className="cyberpunk-grid"></div>
-      
+      <div className="cyberpunk-grid" />
+
+      {toast && showToast && (
+        <div className={`toast ${toast.type}`}>
+          <div className="toast-pulse" />
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       <header className="assistant-header">
         <div className="header-content">
           <Brain className="header-icon" size={32} />
-          <h1>Holistic Assistant</h1>
-          <div className="status-indicator">
-            <div className="pulse-dot"></div>
-            <span>System Online</span>
+          <div>
+            <h1>Harmonia Holistic Assistant</h1>
+            <p className="header-subtitle">
+              {assistantState?.stress?.headline ?? 'Calibrating your day around wellbeing and output'}
+            </p>
           </div>
+          <div className={`status-indicator ${levelTag}`}>
+            <div className="pulse-dot" />
+            <span>{assistantState?.stress?.label ?? 'Calibrating'}</span>
+          </div>
+          {llmInfo?.enabled && (
+            <div className={`llm-badge ${llmInfo.used ? 'active' : 'fallback'}`}>
+              <Sparkles size={14} />
+              <span>{llmInfo.used ? 'LLM enriched plan' : 'Heuristic fallback'}</span>
+            </div>
+          )}
         </div>
       </header>
 
-      <div className="dashboard-grid">
-        {/* Priorities Column */}
-        <div className="cyber-card priorities-column">
-          <div className="card-header">
-            <Zap className="card-icon" size={24} />
-            <h2>Upcoming Priorities</h2>
-            <div className="cyber-border"></div>
+      <section className="assistant-controls">
+        <div className="control-card">
+          <div className="control-card-header">
+            <Sparkles size={20} />
+            <h2>Live Context Tuning</h2>
           </div>
-          
-          <div className="card-content">
-            <ul className="priorities-list">
-              {priorities.map((item, index) => (
-                <li key={index} className="priority-item">
-                  <div className="priority-content">
-                    <item.icon className="priority-icon" size={18} />
-                    <span className="priority-text">{item.text}</span>
-                  </div>
-                  {item.badge && <span className="cyber-badge">{item.badge}</span>}
-                  {item.suggestion && <div className="ai-suggestion">{item.suggestion}</div>}
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          <div className="card-footer">
-            <span className="footer-text">5 tasks pending</span>
-          </div>
-        </div>
-
-        {/* Heart Rate Monitor Column */}
-        <div className="cyber-card health-column">
-          <div className="card-header">
-            <Heart className="card-icon" size={24} />
-            <h2>Vital Signs</h2>
-            <div className="cyber-border"></div>
-          </div>
-          
-          <div className="card-content">
-            <div className="heart-rate-monitor">
-              <div className="monitor-header">
-                <span className="monitor-title">Cardiac Rhythm</span>
-                <button 
-                  className={`monitor-toggle ${isAnimating ? 'active' : ''}`}
-                  onClick={() => setIsAnimating(!isAnimating)}
-                >
-                  {isAnimating ? 'Pause' : 'Resume'}
-                </button>
-              </div>
-              
-              <div className="ecg-container">
-                <div className="ecg-line">
-                  {Array.from({ length: 50 }).map((_, i) => (
-                    <div 
-                      key={i}
-                      className="ecg-segment"
-                      style={{ animationDelay: `${i * 0.1}s` }}
-                    ></div>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="vital-stats">
-                <div className="stat">
-                  <span className="stat-label">Heart Rate</span>
-                  <span className="stat-value">{heartRate} BPM</span>
-                </div>
-                <div className="stat">
-                  <span className="stat-label">Status</span>
-                  <span className="stat-status normal">Normal</span>
-                </div>
-                <div className="stat">
-                  <span className="stat-label">Variability</span>
-                  <span className="stat-value">12 ms</span>
-                </div>
-              </div>
+          <p className="control-description">
+            Adjust the inputs below to simulate your current load. Harmonia recomputes stress, cognitive load, and interventions instantly.
+          </p>
+          <div className="control-grid">
+            <div className="control-field">
+              <label>Heart Rate</label>
+              <span className="control-value">{form.heartRate} bpm</span>
+              <input
+                type="range"
+                min={55}
+                max={110}
+                value={form.heartRate}
+                onChange={handleRangeChange('heartRate')}
+              />
+            </div>
+            <div className="control-field">
+              <label>HRV</label>
+              <span className="control-value">{form.hrv} ms</span>
+              <input
+                type="range"
+                min={20}
+                max={110}
+                value={form.hrv}
+                onChange={handleRangeChange('hrv')}
+              />
+            </div>
+            <div className="control-field">
+              <label>Calendar Load</label>
+              <span className="control-value">{toPercent(form.calendarLoad)}%</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(form.calendarLoad * 100)}
+                onChange={handleRangeChange('calendarLoad', (value) => value / 100)}
+              />
+            </div>
+            <div className="control-field">
+              <label>Unread Messages</label>
+              <span className="control-value">{form.unreadEmails}</span>
+              <input
+                type="range"
+                min={0}
+                max={120}
+                value={form.unreadEmails}
+                onChange={handleRangeChange('unreadEmails')}
+              />
+            </div>
+            <div className="control-field">
+              <label>Sleep Quality</label>
+              <span className="control-value">{toPercent(form.sleepQuality)}%</span>
+              <input
+                type="range"
+                min={40}
+                max={100}
+                value={Math.round(form.sleepQuality * 100)}
+                onChange={handleRangeChange('sleepQuality', (value) => value / 100)}
+              />
+            </div>
+            <div className="control-field">
+              <label>Steps Today</label>
+              <span className="control-value">{form.stepsToday}</span>
+              <input
+                type="range"
+                min={0}
+                max={8000}
+                step={100}
+                value={form.stepsToday}
+                onChange={handleRangeChange('stepsToday')}
+              />
+            </div>
+            <div className="control-field">
+              <label>Minutes Since Break</label>
+              <span className="control-value">{form.lastBreakMinutesAgo}</span>
+              <input
+                type="range"
+                min={0}
+                max={150}
+                value={form.lastBreakMinutesAgo}
+                onChange={handleRangeChange('lastBreakMinutesAgo')}
+              />
+            </div>
+            <div className="control-field">
+              <label>Mood Signal</label>
+              <span className="control-value">{Math.round(form.sentimentScore * 100) / 100}</span>
+              <input
+                type="range"
+                min={-100}
+                max={100}
+                value={Math.round(form.sentimentScore * 100)}
+                onChange={handleRangeChange('sentimentScore', (value) => value / 100)}
+              />
+            </div>
+            <div className="control-field">
+              <label>Hydration</label>
+              <span className="control-value">{toPercent(form.hydration)}%</span>
+              <input
+                type="range"
+                min={30}
+                max={100}
+                value={Math.round(form.hydration * 100)}
+                onChange={handleRangeChange('hydration', (value) => value / 100)}
+              />
             </div>
           </div>
-          
-          <div className="card-footer">
-            <span className="footer-text">Last updated: Just now</span>
+          <div className="control-actions">
+            <button className="cyber-button" onClick={handleAnalyze} disabled={analyzing}>
+              {analyzing ? 'Synthesising plan…' : 'Run Adaptive Plan'}
+            </button>
+            <button className="cyber-button ghost" onClick={fetchSummary} disabled={loading}>
+              Reset to live feed
+            </button>
           </div>
+          {error && <p className="error-text">{error}</p>}
         </div>
 
-        {/* Suggestions Column */}
-        <div className="cyber-card suggestions-column">
-          <div className="card-header">
-            <Brain className="card-icon" size={24} />
-            <h2>Proactive Suggestions</h2>
-            <div className="cyber-border"></div>
+        <div className="status-card">
+          <div className="status-header">
+            <Heart size={22} />
+            <h3>Stress Synthesis</h3>
           </div>
-          
-          <div className="card-content">
-            <ul className="suggestions-list">
-              {suggestions.map((item, index) => (
-                <li key={index} className="suggestion-item">
-                  <div className="suggestion-content">
-                    <item.icon className="suggestion-icon" size={18} />
-                    <div className="suggestion-text">
-                      <span className="suggestion-main">{item.text}</span>
-                      {item.detail && <span className="suggestion-detail">{item.detail}</span>}
+            <div className={`stress-indicator ${levelTag}`}>
+              <div className="stress-score">
+                <span className="score-value">{stressPercent}</span>
+                <span className="score-unit">/100</span>
+              </div>
+              <div className="stress-bar">
+                <div className="stress-bar-fill" style={{ width: `${stressPercent}%` }} />
+              </div>
+              <span className="stress-label">{assistantState?.stress?.label ?? 'Calibrating'}</span>
+            </div>
+            <ul className="status-signals">
+              <li>
+                <Activity size={16} /> Heart rate {stressSignals?.heartRate ?? form.heartRate} bpm
+              </li>
+              <li>
+                <AlertCircle size={16} /> Break overdue by {stressSignals?.lastBreakMinutesAgo ?? form.lastBreakMinutesAgo} min
+              </li>
+              <li>
+                <Mail size={16} /> {stressSignals?.unreadEmails ?? form.unreadEmails} messages waiting
+              </li>
+            </ul>
+          <div className="status-rationale">
+            {stressRationale.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+            {!stressRationale.length && (
+              <span>We are monitoring your signals — all systems look centred.</span>
+            )}
+          </div>
+          {llmInfo?.notes?.length ? (
+            <div className="llm-notes">
+              {llmInfo.notes.map((item) => (
+                <span key={item}>{item}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      {loading ? (
+        <div className="loading-state">
+          <PauseCircle size={24} />
+          <span>Syncing with calendar, inbox, and wearable streams…</span>
+        </div>
+      ) : (
+        <div className="dashboard-grid">
+          <div className="cyber-card priorities-column">
+            <div className="card-header">
+              <Zap className="card-icon" size={24} />
+              <h2>Adaptive Schedule</h2>
+              <div className="cyber-border" />
+            </div>
+            <div className="card-content">
+              <ul className="priorities-list">
+                {focusSchedule?.nextFocusBlock && (
+                  <li className="priority-item">
+                    <div className="priority-content">
+                      <CalendarIcon className="priority-icon" size={18} />
+                      <div>
+                        <span className="priority-text">{focusSchedule.nextFocusBlock.title}</span>
+                        <div className="priority-meta">
+                          {formatTime(focusSchedule.nextFocusBlock.start)} • readiness {toPercent(focusSchedule.nextFocusBlock.readiness)}%
+                        </div>
+                      </div>
                     </div>
+                    <span className="cyber-badge">Focus protected</span>
+                  </li>
+                )}
+                {automations.map((automation) => (
+                  <li key={automation.id} className="priority-item">
+                    <div className="priority-content">
+                      <Sparkles className="priority-icon" size={18} />
+                      <span className="priority-text">{automation.title}</span>
+                    </div>
+                    <div className="ai-suggestion">{automation.detail}</div>
+                  </li>
+                ))}
+                {!focusSchedule?.nextFocusBlock && !automations.length && (
+                  <li className="priority-item empty-state">
+                    <div className="priority-content">
+                      <Sparkles className="priority-icon" size={18} />
+                      <div>
+                        <span className="priority-text">Nothing needs adjusting right now</span>
+                        <div className="priority-meta">We will surface automations the moment your workload shifts.</div>
+                      </div>
+                    </div>
+                  </li>
+                )}
+              </ul>
+            </div>
+            <div className="card-footer">
+              <span className="footer-text">{automations.length} automations active</span>
+            </div>
+          </div>
+
+          <div className="cyber-card health-column">
+            <div className="card-header">
+              <Heart className="card-icon" size={24} />
+              <h2>State of Body & Mind</h2>
+              <div className="cyber-border" />
+            </div>
+            <div className="card-content">
+              <div className="metrics-grid">
+                <div className="metric">
+                  <span className="metric-label">Cognitive Load</span>
+                  <div className="metric-bar">
+                    <div className="metric-bar-fill" style={{ width: `${toPercent(metrics?.cognitiveLoad)}%` }} />
                   </div>
-                  <button className="action-button">→</button>
+                  <span className="metric-value">{toPercent(metrics?.cognitiveLoad)}%</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Fatigue</span>
+                  <div className="metric-bar">
+                    <div className="metric-bar-fill" style={{ width: `${toPercent(metrics?.fatigue)}%` }} />
+                  </div>
+                  <span className="metric-value">{toPercent(metrics?.fatigue)}%</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Focus Readiness</span>
+                  <div className="metric-bar">
+                    <div className="metric-bar-fill" style={{ width: `${toPercent(metrics?.focusReadiness)}%` }} />
+                  </div>
+                  <span className="metric-value">{toPercent(metrics?.focusReadiness)}%</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Buffer Time</span>
+                  <div className="metric-bar">
+                    <div className="metric-bar-fill" style={{ width: `${toPercent(metrics?.bufferTime)}%` }} />
+                  </div>
+                  <span className="metric-value">{toPercent(metrics?.bufferTime)}%</span>
+                </div>
+              </div>
+              <div className="recovery-block">
+                <Clock size={18} />
+                <div>
+                  <span className="recovery-title">Next recovery block</span>
+                  <span className="recovery-detail">
+                    {formatTime(focusSchedule?.nextRecoveryBlock.start)} • {focusSchedule?.nextRecoveryBlock.durationMinutes} min reset
+                  </span>
+                </div>
+              </div>
+              <div className="suppressed-info">
+                <Mail size={16} /> Notifications muted until {formatTime(focusSchedule?.suppressedNotifications.until)} ({focusSchedule?.suppressedNotifications.count} held)
+              </div>
+            </div>
+            <div className="card-footer">
+              <span className="footer-text">Synced {new Date(assistantState?.timestamp ?? Date.now()).toLocaleTimeString()}</span>
+            </div>
+          </div>
+
+          <div className="cyber-card suggestions-column">
+            <div className="card-header">
+              <Brain className="card-icon" size={24} />
+              <h2>Recommended Interventions</h2>
+              <div className="cyber-border" />
+            </div>
+            <div className="card-content">
+              {hasRecommendations ? (
+                <ul className="suggestions-list">
+                  {recommendations.map((rec) => (
+                    <li key={rec.id} className="suggestion-item">
+                      <div className="suggestion-content">
+                        <CheckCircle className="suggestion-icon" size={18} />
+                        <div className="suggestion-text">
+                          <span className="suggestion-main">{rec.title}</span>
+                          <span className="suggestion-detail">{rec.description}</span>
+                        </div>
+                      </div>
+                      <div className="suggestion-meta">
+                        <span>{rec.impact} impact</span>
+                        <span>{rec.timeframe}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="empty-panel">
+                  <CheckCircle size={18} />
+                  <p>All caught up. Keep listening to your energy and Harmonia will nudge you if anything changes.</p>
+                </div>
+              )}
+            </div>
+            <div className="card-footer">
+              <span className="footer-text">Assistant keeps adapting as signals change</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!loading && (
+        <section className="timeline-section">
+          <div className="timeline-header">
+            <CalendarIcon size={20} />
+            <h3>What Harmonia is orchestrating today</h3>
+          </div>
+          {hasTimeline ? (
+            <ul className="timeline-list">
+              {timeline.map((item) => (
+                <li key={item.id} className={`timeline-item ${item.type}`}>
+                  <span className="timeline-time">{item.timeLabel}</span>
+                  <div className="timeline-content">
+                    <span className="timeline-label">{item.label}</span>
+                    <span className="timeline-detail">{item.detail}</span>
+                  </div>
+                  <span className={`timeline-status ${item.status}`}>{item.status}</span>
                 </li>
               ))}
             </ul>
-          </div>
-          
-          <div className="card-footer">
-            <span className="footer-text">AI Analysis: Optimal Performance</span>
-          </div>
-        </div>
-      </div>
+          ) : (
+            <div className="empty-panel muted">
+              <CalendarIcon size={20} />
+              <p>Your day is wide open. Drop in a focus session or request a wellbeing break when you need it.</p>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 };
