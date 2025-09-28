@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Badge, Button } from 'react-bootstrap';
-import { FiChevronLeft, FiChevronRight, FiCalendar } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiCalendar, FiMail, FiFileText, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
 import './Calendar.css';
 
 interface CalendarProps {
@@ -10,7 +10,7 @@ interface CalendarProps {
 interface Project {
   _id: number;
   title: string;
-  description: string;
+  description?: string;
   research_area: string;
   start_date: string;
   end_date: string;
@@ -28,10 +28,32 @@ interface CalendarEvent {
 const Calendar: React.FC<CalendarProps> = ({ projects = [] }) => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
+  // Dummy priorities for random events
+  const priorities = [
+    { icon: FiCalendar, text: "Meeting with John", badge: "high urgency - Q3 report" },
+    { icon: FiMail, text: "Draft marketing email", suggestion: "AI suggests doing this while focused" },
+    { icon: FiFileText, text: "Review Project X Proposal" },
+    { icon: FiCheckCircle, text: "Submit weekly report", badge: "due today" },
+    { icon: FiAlertCircle, text: "Team sync call", badge: "10:30 AM" }
+  ];
+
+  // Generate dummy projects with random start/end dates
+  const dummyProjects: Project[] = priorities.map((p, i) => ({
+    _id: i + 1,
+    title: p.text,
+    description: p.suggestion || "",
+    research_area: "General",
+    start_date: new Date(currentDate.getFullYear(), currentDate.getMonth(), Math.floor(Math.random() * 28) + 1).toISOString(),
+    end_date: new Date(currentDate.getFullYear(), currentDate.getMonth(), Math.floor(Math.random() * 28) + 1).toISOString(),
+    institution: null
+  }));
+
+  const allProjects = projects.length > 0 ? projects : dummyProjects;
+
   // Compute calendar events from projects
   const calendarEvents = useMemo(() => {
     const events: CalendarEvent[] = [];
-    projects.forEach(project => {
+    allProjects.forEach(project => {
       events.push({
         id: project._id * 1000 + 1,
         title: project.title,
@@ -48,7 +70,7 @@ const Calendar: React.FC<CalendarProps> = ({ projects = [] }) => {
       });
     });
     return events;
-  }, [projects]);
+  }, [allProjects]);
 
   // Helper functions
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -72,7 +94,6 @@ const Calendar: React.FC<CalendarProps> = ({ projects = [] }) => {
     const firstDayOfMonth = getFirstDayOfMonth(year, month);
 
     const days: React.ReactNode[] = [];
-
 
     for (let i = 0; i < firstDayOfMonth; i++) {
       days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
@@ -116,47 +137,45 @@ const Calendar: React.FC<CalendarProps> = ({ projects = [] }) => {
     return days;
   };
 
-return (
-  <>
-    {/* Page Title */}
-    <h2 className="calendar-page-title">Calendar</h2>
+  return (
+    <>
+      <h2 className="calendar-page-title">Calendar</h2>
 
-    <Card className="calendar-card">
-      <Card.Body>
-        <div className="calendar-header">
-          <div className="calendar-title">
-            <h4>
-              <FiCalendar className="me-2" />
-              {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(currentDate)}
-            </h4>
+      <Card className="calendar-card">
+        <Card.Body>
+          <div className="calendar-header">
+            <div className="calendar-title">
+              <h4>
+                <FiCalendar className="me-2" />
+                {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(currentDate)}
+              </h4>
+            </div>
+            <div className="calendar-actions">
+              <Button variant="outline-secondary" size="sm" onClick={goToToday} className="me-2">Today</Button>
+              <Button variant="outline-primary" size="sm" onClick={goToPreviousMonth} className="me-1"><FiChevronLeft /></Button>
+              <Button variant="outline-primary" size="sm" onClick={goToNextMonth}><FiChevronRight /></Button>
+            </div>
           </div>
-          <div className="calendar-actions">
-            <Button variant="outline-secondary" size="sm" onClick={goToToday} className="me-2">Today</Button>
-            <Button variant="outline-primary" size="sm" onClick={goToPreviousMonth} className="me-1"><FiChevronLeft /></Button>
-            <Button variant="outline-primary" size="sm" onClick={goToNextMonth}><FiChevronRight /></Button>
-          </div>
-        </div>
 
-        <div className="calendar-grid">
-          <div className="calendar-weekdays">
-            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+          <div className="calendar-grid">
+            <div className="calendar-weekdays">
+              <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+            </div>
+            <div className="calendar-days">{renderCalendar()}</div>
           </div>
-          <div className="calendar-days">{renderCalendar()}</div>
-        </div>
 
-        <div className="calendar-legend">
-          <div className="legend-item">
-            <div className="legend-color start"></div><div>Project Start</div>
+          <div className="calendar-legend">
+            <div className="legend-item">
+              <div className="legend-color start"></div><div>Project Start</div>
+            </div>
+            <div className="legend-item">
+              <div className="legend-color end"></div><div>Project End</div>
+            </div>
           </div>
-          <div className="legend-item">
-            <div className="legend-color end"></div><div>Project End</div>
-          </div>
-        </div>
-      </Card.Body>
-    </Card>
-  </>
-);
-
+        </Card.Body>
+      </Card>
+    </>
+  );
 };
 
 export default Calendar;

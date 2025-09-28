@@ -2,9 +2,8 @@
 .smart-task-list {
   min-height: 100vh;
   padding: 2rem;
-  background: #f8fafc;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #1f2937;
+  color: #1a1b1b;
 }
 
 .dashboard-layout {
@@ -398,4 +397,100 @@
     gap: 1rem;
     flex-wrap: wrap;
   }
+}
+
+/* Dark Mode Styles */
+.dark-mode {
+  background: #25282e; /* dark slate */
+  color: #f9fafb;
+}
+
+.dark-mode .task-box,
+.dark-mode .insights-box {
+  background: #232425;
+  border: 1px solid #374151;
+  color: #f9fafb;
+  border: 2px solid #3b82f6;
+}
+
+.dark-mode .box-header h1 {
+  color: #f9fafb;
+}
+
+.dark-mode .time-tab {
+  color: #9ca3af;
+}
+.dark-mode .time-tab.active,
+.dark-mode .time-tab:hover {
+  color: #3b82f6;
+}
+
+.dark-mode .divider {
+  background: #374151;
+}
+
+.dark-mode .task-item {
+  border-bottom: 1px solid #374151;
+}
+.dark-mode .task-item:hover {
+  background-color: #111827;
+}
+.dark-mode .task-text {
+  color: #f3f4f6;
+}
+.dark-mode .ai-suggestion {
+  color: #9ca3af;
+}
+
+.dark-mode .task-icon,
+.dark-mode .more-icon {
+  color: #d1d5db;
+}
+
+.dark-mode .defer-button {
+  background: #4b5563;
+  color: #f87171;
+  border: 1px solid #6b7280;
+}
+.dark-mode .defer-button:hover {
+  background: #6b7280;
+}
+
+/* Flow states */
+.dark-mode .flow-item.highlighted {
+  background: #1e3a8a;
+  border-left: 3px solid #3b82f6;
+}
+.dark-mode .flow-time,
+.dark-mode .flow-label {
+  color: #f9fafb;
+}
+.dark-mode .flow-schedule {
+  color: #9ca3af;
+}
+
+/* Graph bars */
+.dark-mode .bar-label {
+  color: #d1d5db;
+}
+.dark-mode .bar-annotation {
+  background: #374151;
+  color: #f9fafb;
+}
+.dark-mode .bar-annotation::after {
+  border-top-color: #374151;
+}
+
+/* Insights note */
+.dark-mode .insight-note {
+  background: #1e3a8a;
+  color: #f9fafb;
+}
+/* Toggle button */
+.dark-toggle {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
 }

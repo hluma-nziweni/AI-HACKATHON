@@ -1,61 +1,49 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, TrendingUp, MessageCircle, MoreHorizontal, ChevronDown, Zap, Brain, AlertCircle, Mail, FileText, MessageSquare } from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar
+} from 'recharts';
 import './Tasks.css';
 
 const SmartTaskList: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'today' | 'tomorrow' | 'upcoming'>('today');
 
+  // Dummy data for Flow State History (line chart)
+  const flowData = [
+    { time: '7 AM', focus: 20 },
+    { time: '9 AM', focus: 32 }, // peak
+    { time: '11 AM', focus: 28 },
+    { time: '3 PM', focus: 20 },
+    { time: '9 PM', focus: 18 },
+  ];
+
+  // Dummy data for Cognitive Load Trends (bar chart)
+  const loadData = [
+    { day: 'Mon', load: 20 },
+    { day: 'Tue', load: 45 }, // busiest
+    { day: 'Wed', load: 30 },
+    { day: 'Thu', load: 25 },
+    { day: 'Fri', load: 22 },
+    { day: 'Sat', load: 18 },
+  ];
+
   const todayTasks = [
-    { 
-      icon: AlertCircle,
-      text: "Meeting prep for John (high urgency - Q3 report)",
-      hasAction: true,
-      actionText: "Defer"
-    },
-    { 
-      icon: Mail,
-      text: "Draft marketing email",
-      hasSuggestion: true,
-      suggestion: "AI suggests doing this while focused"
-    },
-    { 
-      icon: MessageSquare,
-      text: "Follow up Q3 report with John"
-    },
-    { 
-      icon: Brain,
-      text: "AI created from chat"
-    },
-    { 
-      icon: FileText,
-      text: "Review Project X Proposal"
-    }
+    { icon: AlertCircle, text: "Meeting prep for John (high urgency - Q3 report)", hasAction: true, actionText: "Defer" },
+    { icon: Mail, text: "Draft marketing email", hasSuggestion: true, suggestion: "AI suggests doing this while focused" },
+    { icon: MessageSquare, text: "Follow up Q3 report with John" },
+    { icon: Brain, text: "AI created from chat" },
+    { icon: FileText, text: "Review Project X Proposal" }
   ];
 
   const tomorrowTasks = [
-    { 
-      icon: Calendar,
-      text: "Team weekly meeting",
-      hasAction: true,
-      actionText: "Reschedule"
-    },
-    { 
-      icon: FileText,
-      text: "Submit monthly report"
-    }
+    { icon: Calendar, text: "Team weekly meeting", hasAction: true, actionText: "Reschedule" },
+    { icon: FileText, text: "Submit monthly report" }
   ];
 
   const upcomingTasks = [
-    { 
-      icon: Zap,
-      text: "Quarterly planning session",
-      hasAction: true,
-      actionText: "Prepare"
-    },
-    { 
-      icon: Calendar,
-      text: "Client presentation"
-    }
+    { icon: Zap, text: "Quarterly planning session", hasAction: true, actionText: "Prepare" },
+    { icon: Calendar, text: "Client presentation" }
   ];
 
   const getCurrentTasks = () => {
@@ -79,24 +67,15 @@ const SmartTaskList: React.FC = () => {
           </div>
           
           <div className="time-navigation">
-            <button 
-              className={`time-tab ${activeTab === 'today' ? 'active' : ''}`}
-              onClick={() => setActiveTab('today')}
-            >
-              Today
-            </button>
-            <button 
-              className={`time-tab ${activeTab === 'tomorrow' ? 'active' : ''}`}
-              onClick={() => setActiveTab('tomorrow')}
-            >
-              Tomorrow
-            </button>
-            <button 
-              className={`time-tab ${activeTab === 'upcoming' ? 'active' : ''}`}
-              onClick={() => setActiveTab('upcoming')}
-            >
-              Upcoming
-            </button>
+            {['today','tomorrow','upcoming'].map(tab => (
+              <button 
+                key={tab}
+                className={`time-tab ${activeTab === tab ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab as any)}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
           </div>
           
           <div className="divider"></div>
@@ -108,14 +87,9 @@ const SmartTaskList: React.FC = () => {
                   <task.icon size={18} className="task-icon" />
                   <div className="task-text">
                     {task.text}
-                    {task.hasSuggestion && (
-                      <div className="ai-suggestion">
-                        {task.suggestion}
-                      </div>
-                    )}
+                    {task.hasSuggestion && <div className="ai-suggestion">{task.suggestion}</div>}
                   </div>
                 </div>
-                
                 <div className="task-right">
                   {task.hasAction && (
                     <button className="defer-button">
@@ -137,82 +111,46 @@ const SmartTaskList: React.FC = () => {
             <h1>Productivity Insights</h1>
           </div>
           
-          {/* Flow State History Section */}
+          {/* Flow State History */}
           <div className="insight-section">
             <div className="section-title">
               <Clock size={20} />
               <span>Flow State History</span>
             </div>
-            
-            <div className="flow-states">
-              <div className="flow-item highlighted">
-                <span className="flow-time">9 AM</span>
-                <div className="flow-details">
-                  <span className="flow-label">Peak focus</span>
-                  <span className="flow-schedule">Scheduled for 11 PM</span>
-                </div>
-              </div>
-              
-              {['9 AM', '8 AM', '11 AM', '7 AM', '8 AM', '8 PM'].map((time, index) => (
-                <div key={index} className="flow-item">
-                  <span className="flow-time">{time}</span>
-                </div>
-              ))}
-            </div>
+            <ResponsiveContainer width="100%" height={150}>
+              <LineChart data={flowData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="time" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip />
+                <Line type="monotone" dataKey="focus" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
           
           <div className="divider"></div>
           
-          {/* Cognitive Load Trends Section */}
+          {/* Cognitive Load Trends */}
           <div className="insight-section">
             <div className="section-title">
               <TrendingUp size={20} />
               <span>Cognitive Load Trends</span>
             </div>
-            
-            <div className="cognitive-graph">
-              <div className="graph-bars">
-                {[
-                  { day: 'Mon', height: '40%', color: '#3b82f6' },
-                  { day: 'Tue', height: '75%', color: '#ef4444', highlight: true },
-                  { day: 'Wed', height: '50%', color: '#3b82f6' },
-                  { day: 'Thu', height: '45%', color: '#3b82f6' },
-                  { day: 'Fri', height: '35%', color: '#3b82f6' },
-                  { day: 'Sat', height: '25%', color: '#3b82f6' }
-                ].map((bar, index) => (
-                  <div key={index} className="bar-container">
-                    <div 
-                      className={`bar ${bar.highlight ? 'highlighted' : ''}`}
-                      style={{ 
-                        height: bar.height, 
-                        backgroundColor: bar.color 
-                      }}
-                    ></div>
-                    <span className="bar-label">{bar.day}</span>
-                    {bar.highlight && (
-                      <div className="bar-annotation">
-                        Your busiest communication periods are typically Tuesday afternoons.
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-            
+            <ResponsiveContainer width="100%" height={150}>
+              <BarChart data={loadData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="day" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip />
+                <Bar dataKey="load" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
             <div className="insight-note">
               <MessageCircle size={16} />
               <span>Your busiest communication periods are typically Tuesday afternoons.</span>
             </div>
           </div>
         </div>
-      </div>
-      
-      {/* Footer Navigation */}
-      <div className="footer-nav">
-        <span className="nav-item">Dashboard</span>
-        <span className="nav-item">Tasks</span>
-        <span className="nav-item">Insights</span>
-        <span className="nav-item">Integrations</span>
       </div>
     </div>
   );
